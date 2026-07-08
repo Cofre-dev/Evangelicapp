@@ -38,7 +38,6 @@ type OnboardingCompleteResponse = SessionUser & {
  * paso al rol PASTOR, así que la gatilla replica esa misma condición.
  */
 export function PersonalDataOnboardingModal() {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const usuario = useAuthStore((state) => state.usuario);
   const updateUsuario = useAuthStore((state) => state.updateUsuario);
 
@@ -79,13 +78,12 @@ export function PersonalDataOnboardingModal() {
   }, [open, usuario, form]);
 
   async function onSubmit(values: OnboardingValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setServerError(null);
 
     try {
       const response = await apiFetch<OnboardingCompleteResponse>("/onboarding/complete", {
         method: "PATCH",
-        token: accessToken,
         body: JSON.stringify({
           nombre: values.nombre,
           apellido: values.apellido,

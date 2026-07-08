@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth-store";
 
 interface MiembroEquipo {
   id: string;
@@ -65,20 +64,19 @@ function PersonaRow({ nombre, apellido, cargo, email }: { nombre: string; apelli
 export default function IglesiaDetallePage() {
   const params = useParams<{ id: string }>();
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [data, setData] = useState<IglesiaDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!accessToken || !params.id) return;
+    if (!usuario || !params.id) return;
 
-    apiFetch<IglesiaDetalle>(`/iglesias/${params.id}`, { token: accessToken })
+    apiFetch<IglesiaDetalle>(`/iglesias/${params.id}`)
       .then(setData)
       .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudo cargar la iglesia"))
       .finally(() => setLoading(false));
-  }, [accessToken, params.id]);
+  }, [usuario, params.id]);
 
   if (!ready || !usuario) {
     return null;

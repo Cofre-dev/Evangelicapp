@@ -23,8 +23,6 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
   usuario: SessionUser;
   requiresPasswordChange: boolean;
   requiresOnboarding: boolean;
@@ -62,7 +60,7 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
 
-      setSession(response);
+      setSession(response.usuario);
       router.push("/");
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "No se pudo iniciar sesión");

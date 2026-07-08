@@ -68,7 +68,7 @@ type Step = "iglesia" | "pastor" | "result";
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
 export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("iglesia");
@@ -128,7 +128,7 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
   }
 
   async function onSubmit(values: CreateIglesiaValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setServerError(null);
 
     const formData = new FormData();
@@ -145,7 +145,6 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
     try {
       const response = await apiFetch<CreateIglesiaResponse>("/iglesias", {
         method: "POST",
-        token: accessToken,
         body: formData,
       });
 

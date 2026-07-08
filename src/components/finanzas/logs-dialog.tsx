@@ -25,21 +25,21 @@ interface LogsDialogProps {
 }
 
 export function LogsDialog({ open, onOpenChange }: LogsDialogProps) {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
   const [logs, setLogs] = useState<MovimientoAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !accessToken) return;
+    if (!open || !usuario) return;
     setLoading(true);
     setError(null);
 
-    apiFetch<MovimientoAuditLog[]>("/finanzas/movimientos/logs", { token: accessToken })
+    apiFetch<MovimientoAuditLog[]>("/finanzas/movimientos/logs")
       .then(setLogs)
       .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudieron cargar los logs"))
       .finally(() => setLoading(false));
-  }, [open, accessToken]);
+  }, [open, usuario]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -6,6 +6,26 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-07-08 (continuación) — Auth migrada a cookies httpOnly: completa
+
+El backend confirmó e implementó el contrato propuesto (ver [`docs/auth-cookies.md`](./docs/auth-cookies.md)). Se hicieron los cambios correspondientes del lado del frontend:
+
+- **`src/stores/auth-store.ts`**: se eliminaron `accessToken`/`refreshToken` del store — ahora solo persiste `usuario`. `setSession` cambió de firma: recibe `SessionUser` directo en vez de un objeto `{ accessToken, refreshToken, usuario }`.
+- **`src/lib/api.ts`**: reescrito. `apiFetch` ahora manda `credentials: "include"` en cada request (ya no arma `Authorization` a mano — no hay token en JS que armar). Agrega automáticamente el header `X-CSRF-Token` en requests mutantes leyendo la cookie `csrf_token` vía `document.cookie`. Maneja 401 con un intento de refresh (`POST /auth/refresh`, coordinado entre pestañas con `navigator.locks` para evitar el falso positivo de "robo" que documenta el backend cuando dos tabs refrescan a la vez) y, si falla, limpia la sesión y redirige a `/login`.
+- **~19 call sites** (todas las páginas y diálogos que llamaban `apiFetch(..., { token: accessToken })`): se sacó el parámetro `token` (ya no existe en `apiFetch`) y los guards `if (!accessToken) return` pasaron a chequear `usuario` (mismo propósito: no disparar el fetch antes de que el store rehidrate desde `localStorage`; el guard ya no protege nada relacionado a un token porque las cookies las maneja el navegador solo).
+- **`src/components/layout/navbar.tsx`**: logout ahora solo llama `POST /auth/logout` sin pasar token.
+- **`src/app/finanzas/page.tsx`**: el `fetch` directo para exportar Excel (necesitaba manejo de blob, no pasa por `apiFetch`) cambió `Authorization: Bearer` por `credentials: "include"`.
+
+**Verificado end-to-end, no solo compilado**: contra el backend real corriendo local (Docker MySQL + Nest en :3001) con curl (login → cookies correctas → GET protegido con cookie → POST mutante sin CSRF rechazado 403 → POST con CSRF correcto 201 → refresh rota las 3 cookies → logout las limpia) y con Playwright manejando un Chromium real contra el frontend en :3000 (login → modal de cambio de contraseña y onboarding obligatorios completados vía UI real, ambos PATCH con CSRF → crear y eliminar una nota vía UI, POST y DELETE con CSRF → logout real → cookies en 0 tras logout → navegar a una ruta protegida después de logout rebota a `/login`). Cero errores de consola en todo el flujo.
+
+`npm run lint`, `npm run typecheck` y `npm run build` pasan limpios.
+
+**Efecto secundario del test**: se completó el onboarding del usuario demo `jperez` (mustChangePassword y onboardingCompletado pasaron a reflejar "completado") porque el modal correspondiente es obligatorio y bloquea toda interacción — no se pudo probar el resto de la app sin pasar por ahí. La contraseña se dejó igual (`Temporal123`). Si se necesita el estado "onboarding pendiente" para demos, hay que resetear esos flags manualmente en la base de dev.
+
+**Pendiente**: confirmarle al backend que el frontend ya no usa el header `Authorization: Bearer` en ningún lado, para que puedan retirar ese fallback de compatibilidad.
+
+---
+
 ## 2026-07-08
 
 ### Reestructuración: frontend pasa a ser la raíz del repo

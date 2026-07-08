@@ -11,7 +11,6 @@ import { MonthCalendar } from "@/components/agenda/month-calendar";
 import type { Evento } from "@/components/agenda/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth-store";
 
 const MESES = [
   "Enero",
@@ -32,7 +31,6 @@ const ROLES_CON_ACCESO = ["PASTOR", "TESORERO", "SECRETARIA"];
 
 export default function AgendaPage() {
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [mes, setMes] = useState(() => new Date());
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -44,7 +42,7 @@ export default function AgendaPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | undefined>();
 
   const loadEventos = useCallback(async () => {
-    if (!accessToken) return;
+    if (!usuario) return;
     setLoading(true);
     setError(null);
 
@@ -52,16 +50,14 @@ export default function AgendaPage() {
     const to = new Date(mes.getFullYear(), mes.getMonth() + 1, 7);
 
     try {
-      const data = await apiFetch<Evento[]>(`/agenda/eventos?from=${from.toISOString()}&to=${to.toISOString()}`, {
-        token: accessToken,
-      });
+      const data = await apiFetch<Evento[]>(`/agenda/eventos?from=${from.toISOString()}&to=${to.toISOString()}`);
       setEventos(data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar la agenda");
     } finally {
       setLoading(false);
     }
-  }, [accessToken, mes]);
+  }, [usuario, mes]);
 
   useEffect(() => {
     loadEventos();

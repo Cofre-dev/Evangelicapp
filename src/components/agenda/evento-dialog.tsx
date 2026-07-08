@@ -99,7 +99,7 @@ export function EventoDialog({
   onSaved,
   onDeleted,
 }: EventoDialogProps) {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
   const esEdicion = Boolean(evento);
 
   const [step, setStep] = useState<Step>("form");
@@ -191,7 +191,7 @@ export function EventoDialog({
   }
 
   async function guardar(values: EventoValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setServerError(null);
 
     const body = {
@@ -209,7 +209,6 @@ export function EventoDialog({
     try {
       await apiFetch(esEdicion ? `/agenda/eventos/${evento!.id}` : "/agenda/eventos", {
         method: esEdicion ? "PATCH" : "POST",
-        token: accessToken,
         body: JSON.stringify(body),
       });
 
@@ -221,10 +220,10 @@ export function EventoDialog({
   }
 
   async function handleDelete() {
-    if (!accessToken || !evento) return;
+    if (!usuario || !evento) return;
     setDeleting(true);
     try {
-      await apiFetch(`/agenda/eventos/${evento.id}`, { method: "DELETE", token: accessToken });
+      await apiFetch(`/agenda/eventos/${evento.id}`, { method: "DELETE" });
       onOpenChange(false);
       onDeleted();
     } catch (error) {

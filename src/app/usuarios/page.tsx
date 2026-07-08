@@ -11,7 +11,6 @@ import { CreateUsuarioDialog } from "@/components/usuarios/create-usuario-dialog
 import type { UsuarioEquipo } from "@/components/usuarios/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth-store";
 
 const ROL_LABEL: Record<UsuarioEquipo["rol"], string> = {
   TESORERO: "Tesorero",
@@ -20,7 +19,6 @@ const ROL_LABEL: Record<UsuarioEquipo["rol"], string> = {
 
 export default function UsuariosPage() {
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [equipo, setEquipo] = useState<UsuarioEquipo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,32 +26,31 @@ export default function UsuariosPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const loadEquipo = useCallback(async () => {
-    if (!accessToken) return;
+    if (!usuario) return;
     setLoading(true);
     setError(null);
 
     try {
-      const data = await apiFetch<UsuarioEquipo[]>("/usuarios", { token: accessToken });
+      const data = await apiFetch<UsuarioEquipo[]>("/usuarios");
       setEquipo(data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar el equipo");
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [usuario]);
 
   useEffect(() => {
     loadEquipo();
   }, [loadEquipo]);
 
   async function toggleActivo(miembro: UsuarioEquipo) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setTogglingId(miembro.id);
 
     try {
       const actualizado = await apiFetch<UsuarioEquipo>(`/usuarios/${miembro.id}`, {
         method: "PATCH",
-        token: accessToken,
         body: JSON.stringify({ activo: !miembro.activo }),
       });
       setEquipo((prev) => prev.map((item) => (item.id === actualizado.id ? actualizado : item)));

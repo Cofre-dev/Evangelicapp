@@ -74,11 +74,16 @@ src/
 
 La app es multi-tenant por iglesia. Roles (`Rol` en `auth-store.ts`): `SUPER_ADMIN`, `PASTOR`, `TESORERO`, `SECRETARIA`, `MIEMBRO`. El home (`src/app/page.tsx`) arma los accesos rápidos según rol (`ACCESOS_POR_ROL`). `SUPER_ADMIN` administra iglesias desde `/superadmin`; el resto opera dentro de su propia iglesia (`iglesiaId` en la sesión).
 
-## Autenticación (estado actual — **en transición**)
+## Autenticación
 
-Hoy: `POST /auth/login` devuelve `{ accessToken, refreshToken, usuario }` en el body; el frontend los guarda en Zustand persistido en `localStorage`, y cada llamada a `apiFetch` arma manualmente el header `Authorization: Bearer <token>`.
+Sesión basada en cookies `httpOnly` (`access_token`, `refresh_token`, `csrf_token`) seteadas por el backend — el frontend nunca ve ni guarda tokens JWT. `src/stores/auth-store.ts` solo persiste `usuario` (datos no sensibles) para hidratar la UI sin flash.
 
-**Esto se está migrando a cookies `httpOnly`** (el esquema actual es vulnerable a robo de tokens vía XSS). El estado de esa migración y el contrato acordado con el backend quedan documentados en `FEATURES.md` a medida que avance — no asumas que el código todavía usa `localStorage` sin confirmarlo ahí.
+`src/lib/api.ts` (`apiFetch`) hace todo el trabajo pesado:
+- `credentials: "include"` en cada request.
+- Lee `csrf_token` de `document.cookie` y lo manda en el header `X-CSRF-Token` en requests mutantes (POST/PUT/PATCH/DELETE) — obligatorio por el `CsrfMiddleware` del backend (double-submit cookie).
+- Si una request responde `401`, intenta `POST /auth/refresh` una vez (coordinado entre pestañas con la Web Locks API para no disparar refreshes en paralelo) y reintenta la request original; si el refresh también falla, limpia la sesión y redirige a `/login`.
+
+Contrato completo (nombres/atributos de cookies, endpoints, CSRF, rotación de refresh token) en [`docs/auth-cookies.md`](./docs/auth-cookies.md).
 
 ## Backend
 

@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CreateIglesiaDialog } from "@/components/iglesias/create-iglesia-dialog";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth-store";
 
 interface DashboardResponse {
   totales: {
@@ -92,25 +91,24 @@ const ESTADO_LABEL: Record<DashboardResponse["iglesias"][number]["estado"], stri
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
-    if (!accessToken) return;
+    if (!usuario) return;
     setError(null);
 
     try {
-      const response = await apiFetch<DashboardResponse>("/superadmin/dashboard", { token: accessToken });
+      const response = await apiFetch<DashboardResponse>("/superadmin/dashboard");
       setData(response);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar el dashboard");
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [usuario]);
 
   useEffect(() => {
     loadDashboard();

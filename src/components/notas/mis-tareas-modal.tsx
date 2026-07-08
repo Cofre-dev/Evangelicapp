@@ -28,19 +28,18 @@ interface MisTareasModalProps {
 }
 
 export function MisTareasModal({ open, onOpenChange, tareas, onTareaActualizada }: MisTareasModalProps) {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function marcarHecha(tarea: Nota) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setProcesandoId(tarea.id);
     setError(null);
 
     try {
       const actualizada = await apiFetch<Nota>(`/notas/${tarea.id}/marcar-hecha`, {
         method: "PATCH",
-        token: accessToken,
       });
       onTareaActualizada(actualizada);
     } catch (err) {

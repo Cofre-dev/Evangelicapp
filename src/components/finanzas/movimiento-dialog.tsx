@@ -61,7 +61,7 @@ export function MovimientoDialog({
   onSaved,
   onDeleted,
 }: MovimientoDialogProps) {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
   const esEdicion = Boolean(movimiento);
 
   const [modo, setModo] = useState<Modo>("editar");
@@ -134,14 +134,13 @@ export function MovimientoDialog({
   }
 
   async function crearCategoria() {
-    if (!accessToken || !nombreNuevaCategoria.trim()) return;
+    if (!usuario || !nombreNuevaCategoria.trim()) return;
     setCreandoCategoriaLoading(true);
     setServerError(null);
 
     try {
       const nueva = await apiFetch<Categoria>("/finanzas/categorias", {
         method: "POST",
-        token: accessToken,
         body: JSON.stringify({ nombre: nombreNuevaCategoria.trim(), tipo }),
       });
 
@@ -159,7 +158,7 @@ export function MovimientoDialog({
   }
 
   async function guardar(values: MovimientoValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
 
     const body = {
       categoriaId: values.categoriaId,
@@ -171,7 +170,6 @@ export function MovimientoDialog({
 
     await apiFetch(esEdicion ? `/finanzas/movimientos/${movimiento!.id}` : "/finanzas/movimientos", {
       method: esEdicion ? "PATCH" : "POST",
-      token: accessToken,
       body: JSON.stringify(body),
     });
 
@@ -213,14 +211,13 @@ export function MovimientoDialog({
   }
 
   async function confirmarEliminacion() {
-    if (!accessToken || !movimiento || !passwordEliminar) return;
+    if (!usuario || !movimiento || !passwordEliminar) return;
     setDeleting(true);
     setServerError(null);
 
     try {
       await apiFetch(`/finanzas/movimientos/${movimiento.id}`, {
         method: "DELETE",
-        token: accessToken,
         body: JSON.stringify({ password: passwordEliminar }),
       });
       onOpenChange(false);

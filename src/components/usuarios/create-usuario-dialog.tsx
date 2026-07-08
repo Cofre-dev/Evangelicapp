@@ -46,7 +46,7 @@ interface CreateUsuarioResponse {
 }
 
 export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: UsuarioEquipo) => void }) {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
 
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -69,13 +69,12 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
   }
 
   async function onSubmit(values: CreateUsuarioValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setServerError(null);
 
     try {
       const response = await apiFetch<CreateUsuarioResponse>("/usuarios", {
         method: "POST",
-        token: accessToken,
         body: JSON.stringify({
           username: values.username,
           email: values.email,

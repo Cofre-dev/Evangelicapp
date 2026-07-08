@@ -50,7 +50,6 @@ interface NotaDialogProps {
 }
 
 export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATORIO", onSaved, onDeleted }: NotaDialogProps) {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const usuario = useAuthStore((state) => state.usuario);
   const esEdicion = Boolean(nota);
 
@@ -84,18 +83,18 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
   }, [open, nota, defaultTipo, form]);
 
   useEffect(() => {
-    if (!open || !accessToken) return;
-    apiFetch<MiembroEquipo[]>("/usuarios", { token: accessToken })
+    if (!open || !usuario) return;
+    apiFetch<MiembroEquipo[]>("/usuarios")
       .then(setEquipo)
       .catch(() => setEquipo([]));
-  }, [open, accessToken]);
+  }, [open, usuario]);
 
   const opcionesAsignacion = usuario
     ? [{ id: usuario.id, nombre: usuario.nombre, apellido: usuario.apellido }, ...equipo]
     : equipo;
 
   async function onSubmit(values: NotaValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setServerError(null);
 
     const body = {
@@ -109,7 +108,6 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
     try {
       await apiFetch(esEdicion ? `/notas/${nota!.id}` : "/notas", {
         method: esEdicion ? "PATCH" : "POST",
-        token: accessToken,
         body: JSON.stringify(body),
       });
 
@@ -121,10 +119,10 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
   }
 
   async function handleDelete() {
-    if (!accessToken || !nota) return;
+    if (!usuario || !nota) return;
     setDeleting(true);
     try {
-      await apiFetch(`/notas/${nota.id}`, { method: "DELETE", token: accessToken });
+      await apiFetch(`/notas/${nota.id}`, { method: "DELETE" });
       onOpenChange(false);
       onDeleted();
     } catch (error) {

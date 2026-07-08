@@ -37,14 +37,11 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const usuario = useAuthStore((state) => state.usuario);
-  const accessToken = useAuthStore((state) => state.accessToken);
   const clearSession = useAuthStore((state) => state.clearSession);
 
   async function handleLogout() {
     try {
-      if (accessToken) {
-        await apiFetch("/auth/logout", { method: "POST", token: accessToken });
-      }
+      await apiFetch("/auth/logout", { method: "POST" });
     } catch {
       // aunque el backend falle, igual cerramos la sesión local
     } finally {

@@ -10,7 +10,6 @@ import { NotaDialog } from "@/components/notas/nota-dialog";
 import type { Nota, TipoNota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth-store";
 
 function formatoFechaLimite(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
@@ -136,7 +135,6 @@ function NotaLargaRow({ nota, onEdit }: { nota: Nota; onEdit: (nota: Nota) => vo
 
 export default function NotasPage() {
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [notas, setNotas] = useState<Nota[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,19 +146,19 @@ export default function NotasPage() {
   const [tipoNuevo, setTipoNuevo] = useState<TipoNota>("RECORDATORIO");
 
   const loadNotas = useCallback(async () => {
-    if (!accessToken) return;
+    if (!usuario) return;
     setLoading(true);
     setError(null);
 
     try {
-      const data = await apiFetch<Nota[]>("/notas", { token: accessToken });
+      const data = await apiFetch<Nota[]>("/notas");
       setNotas(data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudieron cargar los recordatorios");
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [usuario]);
 
   useEffect(() => {
     loadNotas();
@@ -178,13 +176,12 @@ export default function NotasPage() {
   }
 
   async function actualizarEstado(nota: Nota, estado: "PENDIENTE" | "COMPLETADA") {
-    if (!accessToken) return;
+    if (!usuario) return;
     setProcesandoId(nota.id);
 
     try {
       const actualizada = await apiFetch<Nota>(`/notas/${nota.id}`, {
         method: "PATCH",
-        token: accessToken,
         body: JSON.stringify({ estado }),
       });
       setNotas((prev) => prev.map((n) => (n.id === actualizada.id ? actualizada : n)));

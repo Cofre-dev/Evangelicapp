@@ -9,7 +9,7 @@ import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, apiFetch } from "@/lib/api";
-import { useAuthStore, type Rol } from "@/stores/auth-store";
+import { type Rol } from "@/stores/auth-store";
 
 const ROLES_CON_TAREAS = ["PASTOR", "TESORERO", "SECRETARIA"];
 
@@ -58,20 +58,19 @@ function saludoSegunHora(): string {
 
 export default function Home() {
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [tareas, setTareas] = useState<Nota[]>([]);
   const [modalTareasOpen, setModalTareasOpen] = useState(false);
 
   const cargarTareas = useCallback(async () => {
-    if (!accessToken || !usuario || !ROLES_CON_TAREAS.includes(usuario.rol)) return;
+    if (!usuario || !ROLES_CON_TAREAS.includes(usuario.rol)) return;
     try {
-      const data = await apiFetch<Nota[]>("/notas/mis-tareas", { token: accessToken });
+      const data = await apiFetch<Nota[]>("/notas/mis-tareas");
       setTareas(data);
     } catch {
       // Si falla, simplemente no se muestra el aviso — no es una acción crítica del usuario.
     }
-  }, [accessToken, usuario]);
+  }, [usuario]);
 
   useEffect(() => {
     cargarTareas();

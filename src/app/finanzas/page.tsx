@@ -12,7 +12,6 @@ import { MovimientoDialog } from "@/components/finanzas/movimiento-dialog";
 import { formatoCLP, MEDIO_PAGO_LABEL, type Categoria, type FinanzasDashboard, type Movimiento } from "@/components/finanzas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth-store";
 
 const MESES = [
   "Enero",
@@ -79,7 +78,6 @@ function CategoriaBars({ data, colorClass }: { data: { categoria: string; total:
 
 export default function FinanzasPage() {
   const { usuario, ready } = useRequireAuth();
-  const accessToken = useAuthStore((state) => state.accessToken);
 
   const [mes, setMes] = useState(() => new Date());
   const [dashboard, setDashboard] = useState<FinanzasDashboard | null>(null);
@@ -100,7 +98,7 @@ export default function FinanzasPage() {
   }, [mes]);
 
   const loadDatos = useCallback(async () => {
-    if (!accessToken) return;
+    if (!usuario) return;
     setLoading(true);
     setError(null);
 
@@ -109,9 +107,9 @@ export default function FinanzasPage() {
 
     try {
       const [dashboardData, movimientosData, categoriasData] = await Promise.all([
-        apiFetch<FinanzasDashboard>(`/finanzas/movimientos/dashboard?${query}`, { token: accessToken }),
-        apiFetch<Movimiento[]>(`/finanzas/movimientos?${query}`, { token: accessToken }),
-        apiFetch<Categoria[]>("/finanzas/categorias", { token: accessToken }),
+        apiFetch<FinanzasDashboard>(`/finanzas/movimientos/dashboard?${query}`),
+        apiFetch<Movimiento[]>(`/finanzas/movimientos?${query}`),
+        apiFetch<Categoria[]>("/finanzas/categorias"),
       ]);
       setDashboard(dashboardData);
       setMovimientos(movimientosData);
@@ -121,7 +119,7 @@ export default function FinanzasPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, rangoMes]);
+  }, [usuario, rangoMes]);
 
   useEffect(() => {
     loadDatos();
@@ -142,7 +140,7 @@ export default function FinanzasPage() {
   }
 
   async function exportarExcel() {
-    if (!accessToken) return;
+    if (!usuario) return;
     setExportando(true);
     setError(null);
 
@@ -150,7 +148,7 @@ export default function FinanzasPage() {
       const { from, to } = rangoMes();
       const res = await fetch(
         `${API_URL}/finanzas/movimientos/exportar?from=${from.toISOString()}&to=${to.toISOString()}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
+        { credentials: "include" },
       );
 
       if (!res.ok) throw new Error();

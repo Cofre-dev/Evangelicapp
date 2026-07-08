@@ -36,7 +36,6 @@ type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
  * no tiene botón de cierre ni se puede descartar con click afuera / Escape.
  */
 export function ChangePasswordOnboardingModal() {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const usuario = useAuthStore((state) => state.usuario);
   const updateUsuario = useAuthStore((state) => state.updateUsuario);
 
@@ -50,13 +49,12 @@ export function ChangePasswordOnboardingModal() {
   const open = Boolean(usuario?.mustChangePassword);
 
   async function onSubmit(values: ChangePasswordValues) {
-    if (!accessToken) return;
+    if (!usuario) return;
     setServerError(null);
 
     try {
       await apiFetch<void>("/auth/change-password", {
         method: "PATCH",
-        token: accessToken,
         body: JSON.stringify({
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
