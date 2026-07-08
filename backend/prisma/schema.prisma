@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================================================
+// ENUMS
+// ==========================================================================
+
+enum Rol {
+  SUPER_ADMIN
+  PASTOR
+  TESORERO
+  SECRETARIA
+  MIEMBRO
+}
+
+enum EstadoIglesia {
+  ACTIVA
+  SUSPENDIDA
+  INACTIVA
+}
+
+enum TipoEvento {
+  CULTO
+  REUNION
+  LIMPIEZA
+  OTRO
+}
+
+enum EstadoConfirmacionPredicador {
+  PENDIENTE
+  CONFIRMADO
+  RECHAZADO
+}
+
+enum TipoMovimiento {
+  INGRESO
+  EGRESO
+}
+
+enum EstadoTarea {
+  PENDIENTE
+  COMPLETADA
+}
+
+// ==========================================================================
+// TENANT RAÍZ
+// ==========================================================================
+
+/// Cada fila es un tenant. Ninguna tabla transaccional existe sin apuntar aquí.
+model Iglesia {
+  id        String        @id @default(cuid())
+  nombre    String
+  logoUrl   String?
+  comuna    String
+  region    String
+  direccion String?
+  estado    EstadoIglesia @default(ACTIVA)
+  /// Capturado en el onboarding del pastor; usado en dashboards y reportes.
+  visitantesPromedio Int?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  usuarios              Usuario[]
+  eventos               Evento[]
+  categoriasFinancieras CategoriaFinanciera[]
+  movimientos           MovimientoFinanciero[]
+  notas                 Nota[]
+
+  @@map("iglesias")
+}
+
+// ==========================================================================
+// USUARIOS Y AUTH
+// ==========================================================================
+
+/// SUPER_ADMIN es el único rol con iglesiaId nulo (opera fuera de cualquier tenant).
+/// Todos los demás roles quedan atados a exactamente una iglesia.
+model Usuario {
+  id                   String   @id @default(cuid())
+  /// Credencial de login. El email se mantiene como dato de contacto (notificaciones,
+  /// recuperación de cuenta), pero ya no es lo que se usa para autenticarse.
+  username             String   @unique
+  email                String   @unique
+  password             String
+  nombre               String
+  apellido             String
+  telefono             String?
+  rol                  Rol
+  mustChangePassword   Boolean  @default(true)
+  onboardingCompletado Boolean  @default(false)
+  activo               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  iglesiaId String?
+  iglesia   Iglesia? @relation(fields: [iglesiaId], references: [id], onDelete: Cascade)
+
+  eventosCreados     Evento[]                @relation("EventoCreadoPor")
+  movimientosCreados MovimientoFinanciero[]  @relation("MovimientoCreadoPor")
+  notasCreadas       Nota[]                  @relation("NotaCreadaPor")
+  notasAsignadas     Nota[]                  @relation("NotaAsignadaA")
+  refreshTokens      RefreshToken[]
+
+  @@index([iglesiaId])
+  @@map("usuarios")
+}
+
+/// Habilita rotación/revocación de refresh tokens (logout real, no solo expiración).
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("refresh_tokens")
+}
+
+// ==========================================================================
+// MÓDULO 1 — AGENDA
+// ==========================================================================
+
+model Evento {
+  id            String     @id @default(cuid())
+  titulo        String
+  descripcion   String?
+  tipo          TipoEvento
+  fechaInicio   DateTime
+  fechaFin      DateTime
+  ubicacion     String?
+  colorEtiqueta String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  iglesiaId String
+  iglesia   Iglesia @relation(fields: [iglesiaId], references: [id], onDelete: Cascade)
+
+  creadoPorId String?
+  creadoPor   Usuario? @relation("EventoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  predicadores Predicador[]
+
+  @@index([iglesiaId, fechaInicio])
+  @@map("eventos")
+}
+
+/// Solo aplica cuando Evento.tipo = CULTO. El token público permite
+/// confirmar/rechazar desde el email sin necesitar cuenta en la plataforma.
+model Predicador {
+  id                String                       @id @default(cuid())
+  nombre            String?
+  email             String
+  tokenConfirmacion String                       @unique @default(cuid())
+  estado            EstadoConfirmacionPredicador @default(PENDIENTE)
+  respondidoAt      DateTime?
+  createdAt         DateTime                     @default(now())
+
+  eventoId String
+  evento   Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@index([eventoId])
+  @@map("predicadores")
+}
+
+// ==========================================================================
+// MÓDULO 2 — FINANZAS
+// ==========================================================================
+
+/// Categorías propias por iglesia (ej. Diezmos, Ofrendas, Arriendo, Servicios).
+model CategoriaFinanciera {
+  id        String         @id @default(cuid())
+  nombre    String
+  tipo      TipoMovimiento
+  createdAt DateTime       @default(now())
+
+  iglesiaId String
+  iglesia   Iglesia @relation(fields: [iglesiaId], references: [id], onDelete: Cascade)
+
+  movimientos MovimientoFinanciero[]
+
+  @@unique([iglesiaId, nombre, tipo])
+  @@map("categorias_financieras")
+}
+
+model MovimientoFinanciero {
+  id          String         @id @default(cuid())
+  tipo        TipoMovimiento
+  monto       Decimal        @db.Decimal(12, 2)
+  descripcion String?
+  fecha       DateTime
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  iglesiaId String
+  iglesia   Iglesia @relation(fields: [iglesiaId], references: [id], onDelete: Cascade)
+
+  categoriaId String
+  categoria   CategoriaFinanciera @relation(fields: [categoriaId], references: [id])
+
+  creadoPorId String?
+  creadoPor   Usuario? @relation("MovimientoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([iglesiaId, fecha])
+  @@map("movimientos_financieros")
+}
+
+// ==========================================================================
+// MÓDULO 3 — NOTAS / TAREAS
+// ==========================================================================
+
+model Nota {
+  id          String      @id @default(cuid())
+  titulo      String
+  descripcion String?
+  fechaLimite DateTime?
+  estado      EstadoTarea @default(PENDIENTE)
+  notificado  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  iglesiaId String
+  iglesia   Iglesia @relation(fields: [iglesiaId], references: [id], onDelete: Cascade)
+
+  creadoPorId String
+  creadoPor   Usuario @relation("NotaCreadaPor", fields: [creadoPorId], references: [id])
+
+  asignadoAId String?
+  asignadoA   Usuario? @relation("NotaAsignadaA", fields: [asignadoAId], references: [id], onDelete: SetNull)
+
+  @@index([iglesiaId, fechaLimite])
+  @@map("notas")
+}
