@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Download, Loader2, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, FileClock, Loader2, Plus } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { LogsDialog } from "@/components/finanzas/logs-dialog";
 import { MovimientoDialog } from "@/components/finanzas/movimiento-dialog";
-import { formatoCLP, type Categoria, type FinanzasDashboard, type Movimiento } from "@/components/finanzas/types";
+import { formatoCLP, MEDIO_PAGO_LABEL, type Categoria, type FinanzasDashboard, type Movimiento } from "@/components/finanzas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -90,6 +91,7 @@ export default function FinanzasPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<Movimiento | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
 
   const rangoMes = useCallback(() => {
     const from = new Date(mes.getFullYear(), mes.getMonth(), 1);
@@ -191,6 +193,10 @@ export default function FinanzasPage() {
             <p className="mt-1 text-sm text-muted-foreground">Ingresos y egresos de la iglesia.</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setLogsOpen(true)}>
+              <FileClock className="h-4 w-4" />
+              Logs
+            </Button>
             <Button variant="outline" onClick={exportarExcel} disabled={exportando}>
               {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Exportar
@@ -270,6 +276,7 @@ export default function FinanzasPage() {
                     <TableRow>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Tipo</TableHead>
+                      <TableHead>Medio</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead>Descripción</TableHead>
                       <TableHead className="text-right">Monto</TableHead>
@@ -292,8 +299,9 @@ export default function FinanzasPage() {
                             {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
                           </span>
                         </TableCell>
+                        <TableCell className="text-muted-foreground">{MEDIO_PAGO_LABEL[m.medioPago]}</TableCell>
                         <TableCell className="text-foreground">{m.categoria.nombre}</TableCell>
-                        <TableCell className="text-muted-foreground">{m.descripcion || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{m.descripcion}</TableCell>
                         <TableCell className="text-right font-medium text-foreground">
                           {formatoCLP.format(Number(m.monto))}
                         </TableCell>
@@ -316,6 +324,8 @@ export default function FinanzasPage() {
         onSaved={loadDatos}
         onDeleted={loadDatos}
       />
+
+      <LogsDialog open={logsOpen} onOpenChange={setLogsOpen} />
     </main>
   );
 }

@@ -14,6 +14,7 @@ const NAV_LINKS: Record<Rol, { href: string; label: string }[]> = {
     { href: "/", label: "Inicio" },
     { href: "/agenda", label: "Agenda" },
     { href: "/finanzas", label: "Finanzas" },
+    { href: "/notas", label: "Notas" },
     { href: "/usuarios", label: "Equipo" },
   ],
   TESORERO: [

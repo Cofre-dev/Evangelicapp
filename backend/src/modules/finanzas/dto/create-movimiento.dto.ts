@@ -1,4 +1,5 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+import { MedioPago } from '@prisma/client';
 
 export class CreateMovimientoDto {
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -13,7 +14,11 @@ export class CreateMovimientoDto {
   @IsDateString()
   fecha: string;
 
-  @IsOptional()
+  /** Obligatoria: transparencia de en qué consiste cada movimiento. */
   @IsString()
-  descripcion?: string;
+  @IsNotEmpty()
+  descripcion: string;
+
+  @IsEnum(MedioPago)
+  medioPago: MedioPago;
 }

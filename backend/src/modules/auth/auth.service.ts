@@ -147,6 +147,19 @@ export class AuthService {
     ]);
   }
 
+  /** Confirmación de identidad para acciones sensibles (ej. eliminar un movimiento financiero). */
+  async verifyPassword(usuarioId: string, password: string): Promise<void> {
+    const usuario = await this.prisma.usuario.findUnique({ where: { id: usuarioId } });
+    if (!usuario) {
+      throw new UnauthorizedException();
+    }
+
+    const passwordMatches = await bcrypt.compare(password, usuario.password);
+    if (!passwordMatches) {
+      throw new UnauthorizedException('Contraseña incorrecta');
+    }
+  }
+
   private async issueTokens(usuario: Usuario): Promise<AuthTokens> {
     const payload: JwtPayload = {
       sub: usuario.id,

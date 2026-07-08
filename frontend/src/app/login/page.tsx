@@ -70,10 +70,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(160deg,hsl(var(--primary)/0.14),hsl(var(--accent)/0.5)_60%,hsl(var(--background)))] p-4">
+      <Card className="w-full max-w-sm border-border/80 shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle>Evangelicapp</CardTitle>
+          <CardTitle className="font-display text-3xl italic text-primary">Evangelicapp</CardTitle>
           <CardDescription>Ingresa con las credenciales de tu iglesia</CardDescription>
         </CardHeader>
         <CardContent>

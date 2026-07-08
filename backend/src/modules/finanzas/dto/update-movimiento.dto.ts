@@ -1,4 +1,5 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { MedioPago } from '@prisma/client';
 
 export class UpdateMovimientoDto {
   @IsOptional()
@@ -15,7 +16,13 @@ export class UpdateMovimientoDto {
   @IsDateString()
   fecha?: string;
 
+  /** Si se envía, no puede quedar vacía: la descripción es obligatoria. */
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   descripcion?: string;
+
+  @IsOptional()
+  @IsEnum(MedioPago)
+  medioPago?: MedioPago;
 }

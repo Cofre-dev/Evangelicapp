@@ -6,25 +6,25 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
     "/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/login/page.js"
     ],
-    "/superadmin/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/superadmin/page.js"
+      "static/chunks/app/page.js"
     ],
-    "/superadmin/iglesias/[id]/page": [
+    "/finanzas/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/superadmin/iglesias/[id]/page.js"
+      "static/chunks/app/finanzas/page.js"
+    ],
+    "/notas/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/notas/page.js"
     ],
     "/usuarios/page": [
       "static/chunks/webpack.js",
@@ -36,15 +36,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/agenda/page.js"
     ],
-    "/predicacion/[token]/page": [
+    "/superadmin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/predicacion/[token]/page.js"
+      "static/chunks/app/superadmin/page.js"
     ],
-    "/finanzas/page": [
+    "/superadmin/iglesias/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/finanzas/page.js"
+      "static/chunks/app/superadmin/iglesias/[id]/page.js"
     ]
   }
 }
