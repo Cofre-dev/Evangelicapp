@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Bell, Building2, CalendarDays, LayoutDashboard, NotebookPen, Users, Wallet } from "lucide-react";
 
+import { ProximosEventos } from "@/components/agenda/proximos-eventos";
+import type { Evento } from "@/components/agenda/types";
 import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -12,6 +14,7 @@ import { API_URL, apiFetch } from "@/lib/api";
 import { type Rol } from "@/stores/auth-store";
 
 const ROLES_CON_TAREAS = ["PASTOR", "TESORERO", "SECRETARIA"];
+const ROLES_CON_AGENDA = ["PASTOR", "TESORERO", "SECRETARIA"];
 
 const ROL_LABEL: Record<Rol, string> = {
   PASTOR: "Pastor",
@@ -61,6 +64,8 @@ export default function Home() {
 
   const [tareas, setTareas] = useState<Nota[]>([]);
   const [modalTareasOpen, setModalTareasOpen] = useState(false);
+  const [eventosProximos, setEventosProximos] = useState<Evento[]>([]);
+  const [loadingEventos, setLoadingEventos] = useState(true);
 
   const cargarTareas = useCallback(async () => {
     if (!usuario || !ROLES_CON_TAREAS.includes(usuario.rol)) return;
@@ -72,9 +77,37 @@ export default function Home() {
     }
   }, [usuario]);
 
+  const cargarEventosProximos = useCallback(async () => {
+    if (!usuario || !ROLES_CON_AGENDA.includes(usuario.rol)) {
+      setLoadingEventos(false);
+      return;
+    }
+    setLoadingEventos(true);
+    try {
+      const ahora = new Date();
+      const en30Dias = new Date(ahora.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const data = await apiFetch<Evento[]>(
+        `/agenda/eventos?from=${ahora.toISOString()}&to=${en30Dias.toISOString()}`,
+      );
+      const proximos = data
+        .filter((e) => new Date(e.fechaFin) >= ahora)
+        .sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime())
+        .slice(0, 5);
+      setEventosProximos(proximos);
+    } catch {
+      // Igual que las tareas: no es crítico, la sección simplemente queda vacía.
+    } finally {
+      setLoadingEventos(false);
+    }
+  }, [usuario]);
+
   useEffect(() => {
     cargarTareas();
   }, [cargarTareas]);
+
+  useEffect(() => {
+    cargarEventosProximos();
+  }, [cargarEventosProximos]);
 
   function onTareaActualizada(tarea: Nota) {
     setTareas((prev) => (tarea.estado === "EN_REVISION" ? prev.map((t) => (t.id === tarea.id ? tarea : t)) : prev.filter((t) => t.id !== tarea.id)));
@@ -183,6 +216,8 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {ROLES_CON_AGENDA.includes(usuario.rol) && <ProximosEventos eventos={eventosProximos} loading={loadingEventos} />}
       </div>
 
       <MisTareasModal
