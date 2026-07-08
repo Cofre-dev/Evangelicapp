@@ -1,9 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/notas/page": "app/notas/page.js",
-  "/finanzas/page": "app/finanzas/page.js",
-  "/superadmin/iglesias/[id]/page": "app/superadmin/iglesias/[id]/page.js",
-  "/usuarios/page": "app/usuarios/page.js",
-  "/agenda/page": "app/agenda/page.js",
-  "/login/page": "app/login/page.js"
-}
