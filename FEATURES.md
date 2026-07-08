@@ -6,6 +6,18 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-07-08 (continuación 2) — Widget de próximos eventos en el home
+
+El home (`src/app/page.tsx`) dejaba mucho espacio vacío debajo de "Accesos rápidos" — más notorio para `TESORERO` (2 accesos) y `SECRETARIA` (1 acceso). Se agregó `src/components/agenda/proximos-eventos.tsx`, una sección que consulta `/agenda/eventos` (mismo endpoint que usa `/agenda`) y muestra los próximos 5 eventos de los siguientes 30 días, para los mismos roles que ya tienen acceso a esa sección (`PASTOR`, `TESORERO`, `SECRETARIA` — `ROLES_CON_AGENDA` en `page.tsx`).
+
+A propósito **no se oculta cuando no hay eventos** (a diferencia de "Accesos rápidos", que si está vacío no se renderiza) — muestra un estado vacío invitando a agendar uno, porque el objetivo explícito era llenar espacio con algo útil, no repetir el mismo problema con una sección que desaparece.
+
+`MIEMBRO` no se tocó: no tiene forma de crearse todavía en ningún lado de la app (ni seed, ni UI de creación), así que el "home vacío para un miembro común" no es un caso real hoy — si en el futuro se habilita ese rol, hay que revisar `ACCESOS_POR_ROL.MIEMBRO` (hoy `[]`) y si debería ver este mismo widget en modo solo lectura.
+
+Verificado visualmente contra el backend real (capturas con Playwright): con la sección vacía y con dos eventos de prueba cargados (creados y luego eliminados de la base de dev tras la verificación).
+
+---
+
 ## 2026-07-08 (continuación) — Auth migrada a cookies httpOnly: completa
 
 El backend confirmó e implementó el contrato propuesto (ver [`docs/auth-cookies.md`](./docs/auth-cookies.md)). Se hicieron los cambios correspondientes del lado del frontend:
