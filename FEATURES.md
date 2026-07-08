@@ -6,6 +6,26 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-07-08 (continuación 4) — Rediseño visual del login
+
+**Por qué**: pantalla en blanco con un formulario centrado, sin nada de identidad ni calidez — para una app pensada para pastores y equipos de iglesias en todo Chile, quedaba muy genérica.
+
+**Qué cambió** (`src/app/login/page.tsx`, solo capa visual — cero cambios en `zod`/`apiFetch`/redirect/manejo de errores): pantalla partida en dos en desktop/tablet (`lg:flex-row`) — panel de marca a la izquierda con gradiente (paleta ya existente, `hsl(199...)` a un azul más profundo), ícono `Church` en insignia con vidrio esmerilado, frase de misión, y una lista de los tres módulos principales (Agenda/Finanzas/Notas) con los mismos íconos que ya se usan en "Accesos rápidos" del home — refuerza la identidad visual en vez de agregar una nueva. En mobile, el mismo panel se condensa a una franja superior (no se oculta) para que la pantalla nunca sea "solo blanco con un formulario", ni siquiera en el tamaño donde más se usa esta pantalla (celulares, entrando desde WhatsApp/link directo). Se agregó un texto de ayuda ("¿No tienes una cuenta? Pídele acceso al pastor...") acorde al flujo real de la app (las cuentas las crea el pastor/superadmin, no hay auto-registro).
+
+Verificado con Playwright en desktop (1440px), tablet (1024px) y mobile (390px) — sin errores de consola — y con el flujo de login real de punta a punta (cookies, redirect) para confirmar que el restyling no rompió nada funcional.
+
+---
+
+## 2026-07-08 (continuación 3) — Plan del módulo Colaboradores + QR + convocatorias (WhatsApp/email)
+
+El backend propuso (`docs/colaboradores-qr.md`, todavía **no implementado**) un módulo nuevo: el pastor genera un QR de su iglesia, la gente lo escanea y deja sus datos de contacto (nombre/email/teléfono) en una landing pública sin login; cuando se organiza un culto, alguien del equipo aprieta "Convocar" en el evento y les llega WhatsApp (API oficial de Meta Cloud API, no libs no oficiales) + email a todos los colaboradores activos.
+
+Se respondió (ver histórico de `prompt.md` si se conservó, o pedir el mensaje al backend) señalando una asimetría entre "mismo criterio que agenda" (3 roles: PASTOR/TESORERO/SECRETARIA) y la propuesta real para colaboradores (2 roles: PASTOR/SECRETARIA) — se propuso mantener esa restricción para el CRUD de contactos pero dejar `POST /agenda/eventos/:id/convocar` con los 3 roles de agenda, ya que ahí no se administra la lista de contactos. Pendiente de confirmación del backend: nombre del campo honeypot, formato de `iglesiaLogoUrl`, y forma de la respuesta 429 por rate limit.
+
+**Nada de esto está implementado todavía** — es la fase de planificación. Cuando el backend confirme los 3 puntos pendientes, la fase 1 (CRUD + QR + registro público) arranca reutilizando el patrón de `/predicacion/[token]` para las rutas públicas, y la librería `qrcode` (nueva dependencia, liviana) para generar el QR del lado del cliente.
+
+---
+
 ## 2026-07-08 (continuación 2) — Widget de próximos eventos en el home
 
 El home (`src/app/page.tsx`) dejaba mucho espacio vacío debajo de "Accesos rápidos" — más notorio para `TESORERO` (2 accesos) y `SECRETARIA` (1 acceso). Se agregó `src/components/agenda/proximos-eventos.tsx`, una sección que consulta `/agenda/eventos` (mismo endpoint que usa `/agenda`) y muestra los próximos 5 eventos de los siguientes 30 días, para los mismos roles que ya tienen acceso a esa sección (`PASTOR`, `TESORERO`, `SECRETARIA` — `ROLES_CON_AGENDA` en `page.tsx`).
