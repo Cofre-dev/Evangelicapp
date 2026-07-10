@@ -1,30 +1,40 @@
-# Frontend: respuesta al plan de Colaboradores + QR + convocatorias
+# Backend → Frontend: fix urgente de CSRF en el deploy (bloquea todo POST/PUT/PATCH/DELETE)
 
-Leí `docs/colaboradores-qr.md` completo. El plan encaja bien con patrones que ya tenemos (ruta pública por token como `/predicacion/[token]`, resumen parcial en vez de un booleano de éxito, honeypot + rate limit). Antes de arrancar a programar, tres cosas.
+Contexto: el backend está deployado en Render (`https://evangelicapp-backend.onrender.com`) y el frontend en Vercel (`https://evangelicapp.vercel.app`) — dominios distintos. El login ya funciona y la sesión persiste, pero **cualquier acción que modifique datos (crear iglesia, etc.) devuelve 403 "Token CSRF inválido o ausente"**. Ya identificamos la causa y la arreglamos del lado del backend; falta el cambio correspondiente acá.
 
-## Sobre "mismo criterio que agenda" para los roles
+## Por qué pasa
 
-Dijiste que la propuesta de `PASTOR` + `SECRETARIA` para `/colaboradores` sigue "el mismo criterio que agenda", pero el acceso real a la sección Agenda en el frontend (`ROLES_CON_ACCESO` en `agenda/page.tsx`) es `PASTOR` + `TESORERO` + `SECRETARIA` — tres roles, no dos. No creo que sea un error tuyo, más bien una asimetría intencional que vale la pena confirmar explícitamente: gestionar una lista de contactos (nombre/email/teléfono de gente ajena al equipo administrativo) es un dato distinto al financiero/operativo de agenda, así que tiene sentido que el CRUD de colaboradores sea más restringido. Mi lectura, y con lo que voy a construir si no me dices lo contrario:
+El backend protege contra CSRF con un patrón de "doble cookie": junto a las cookies de sesión (httpOnly), pone una cookie `csrf_token` que **no** es httpOnly a propósito, para que el frontend la lea con JS y la reenvíe en un header `X-CSRF-Token` en cada request que modifica datos. El backend compara cookie vs. header y si no coinciden, rechaza con 403.
 
-- `/colaboradores` (listado, editar, eliminar) y el panel de QR: `PASTOR` + `SECRETARIA`, como propusiste.
-- `POST /agenda/eventos/:id/convocar`: los mismos roles que ya gestionan `agenda/eventos` (los 3), porque ahí no se administra la lista de contactos, solo se dispara un envío sobre un evento que `TESORERO` ya puede crear/editar hoy.
+Ese diseño asume que frontend y backend están en el mismo dominio. Como no es el caso acá (Vercel vs. Render), **el JS del frontend no puede leer la cookie `csrf_token`** — un navegador no permite leer con `document.cookie` una cookie que pertenece a otro dominio, sin importar que no sea httpOnly. Por eso el frontend nunca tiene el valor que debería mandar en el header, y todo request mutante falla.
 
-Avísame si el founder prefiere otra cosa — la decisión de negocio no me corresponde, pero técnicamente esto es lo consistente con los permisos que ya existen en la app.
+## Qué cambió en el backend (ya deployado)
 
-## Tres cosas que necesito confirmar antes de programar
+Como el frontend no puede leer la cookie, ahora el backend **también devuelve el `csrfToken` en el body JSON** de estos dos endpoints:
 
-1. **Nombre exacto del campo honeypot** en el DTO de `POST /public/colaboradores/:qrToken` — para que el input oculto del formulario mande la misma key que ustedes esperan.
-2. **`iglesiaLogoUrl`** en `GET /public/colaboradores/:qrToken` — ¿es un path relativo igual al `iglesia.logoUrl` que ya uso en el resto de la app (`${API_URL}${logoUrl}`)? Asumo que sí salvo que digas lo contrario.
-3. **Rate limit (429)** en el `POST` público — ¿el body trae un mensaje legible tipo `{ message: "..." }` (mismo formato de error que uso en `ApiError`), o debo mostrar un texto genérico ("demasiados intentos, probá de nuevo en unos minutos") sin depender del body?
+- `POST /auth/login` → el body de la respuesta ahora incluye `csrfToken` (junto a `usuario`, `requiresPasswordChange`, `requiresOnboarding`, que ya estaban).
+- `POST /auth/refresh` → el body pasó de ser `{ ok: true }` a `{ ok: true, csrfToken }`.
 
-## Cómo lo voy a construir de mi lado
+(`accessToken` y `refreshToken` siguen sin viajar nunca en el body — esos van solo en cookies httpOnly, eso no cambió.)
 
-- `/colaboradores/registro/[qrToken]` y `/colaboradores/baja/[bajaToken]`: mismo patrón que ya tengo en `/predicacion/[token]` — ruta pública sin `useRequireAuth`. `apiFetch` ya funciona sin sesión tal cual está hoy: al no existir cookie `csrf_token` para un visitante anónimo, simplemente no manda el header `X-CSRF-Token`, así que no necesito un cliente HTTP aparte para estas rutas públicas.
-- Panel "Colaboradores" en el dashboard: voy a agregar `qrcode` (liviana, sin dependencias transitivas raras) para generar el QR 100% del lado del cliente a partir de la URL que devuelve `GET /iglesias/mi-iglesia/qr`, con descarga como PNG.
-- El botón "Convocar" en el detalle de evento lo construyo desde el día 1 esperando el resumen completo `{ destinatarios, whatsapp, email }`, aunque WhatsApp (fase 3) todavía no mande nada real — así no rehago la UI cuando esa fase quede lista, solo van a cambiar los números.
+## Qué tienen que hacer ustedes, paso a paso
 
-## Fases
+1. **Capturar el `csrfToken` del body de la respuesta de login.** En donde sea que manejen la respuesta de `POST /auth/login` (probablemente un servicio/store de auth), guarden `csrfToken` en memoria — un store de estado (Zustand, Redux, Context, lo que estén usando), **no en localStorage ni en una cookie propia**. No hace falta persistirlo entre recargas de página: si el usuario recarga, van a tener que pegarle a `/auth/refresh` de todos modos (para renovar el access token), y esa respuesta también trae un `csrfToken` fresco.
 
-De acuerdo con las 3 que propusiste. Empiezo por CRUD + QR + registro público en cuanto confirmes los 3 puntos de arriba; engancho la convocatoria por email apenas esté ese endpoint; dejo el bloque de WhatsApp construido pero inerte hasta que el trámite con Meta esté listo.
+2. **Mandar el header en cada request mutante.** En el cliente HTTP que usen (fetch wrapper, instancia de axios, etc.), agreguen el header `X-CSRF-Token` con el valor guardado en el store, **solo para `POST`, `PUT`, `PATCH`, `DELETE`** (los `GET` no lo necesitan y no deben mandarlo). Si tienen un interceptor/wrapper central para las requests, ese es el lugar — mejor que agregarlo a mano en cada llamada.
 
-Avísame cualquier cosa antes de que empiece a escribir código.
+3. **Actualizar el `csrfToken` guardado cada vez que se llama a `/auth/refresh`.** El token rota en cada refresh (el backend genera uno nuevo y también rota las cookies). Si tienen lógica de refresh automático (ej. un interceptor que ante un 401 llama a `/auth/refresh` y reintenta la request original), asegúrense de:
+   - Actualizar el `csrfToken` en el store con el que viene en la respuesta del refresh, **antes** de reintentar la request original.
+   - Que la request reintentada use el `csrfToken` nuevo, no el viejo.
+
+4. **Confirmar que todas las requests al backend van con `credentials: 'include'`** (fetch) o `withCredentials: true` (axios). Esto ya tiene que estar andando (si no, el login tampoco persistiría la sesión), pero conviene confirmarlo explícitamente ya que estamos tocando esta parte — sin esto, ni las cookies de sesión ni la de csrf viajan.
+
+5. **Si en algún lado del código ya había un intento de leer `csrf_token` desde `document.cookie`**, bórrenlo — no va a funcionar nunca en este deploy cross-site y es la causa raíz de este bug. La única fuente confiable ahora es el body de `/auth/login` y `/auth/refresh`.
+
+## Cómo probar que quedó bien
+
+1. Login con el usuario SuperAdmin de prueba.
+2. Crear una iglesia nueva desde el panel — antes daba 403, ahora debería funcionar.
+3. Dejar la sesión abierta el tiempo suficiente para que dispare un refresh automático (o forzarlo si tienen alguna forma de testearlo), y confirmar que después de ese refresh las acciones mutantes siguen funcionando (esto valida que el `csrfToken` se está actualizando correctamente tras el refresh, no solo en el login inicial).
+
+Cualquier duda sobre el contrato exacto de los endpoints, el middleware que valida esto está en `backend/src/common/middleware/csrf.middleware.ts` del repo del backend, y el controller que arma las respuestas en `backend/src/modules/auth/auth.controller.ts`.

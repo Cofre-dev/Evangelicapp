@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Building2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { API_URL, apiFetch } from "@/lib/api";
+import { API_URL, apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type Rol } from "@/stores/auth-store";
 
 const NAV_LINKS: Record<Rol, { href: string; label: string }[]> = {
@@ -45,6 +45,7 @@ export function Navbar() {
     } catch {
       // aunque el backend falle, igual cerramos la sesión local
     } finally {
+      setCsrfToken(null);
       clearSession();
       router.replace("/login");
     }

@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type SessionUser } from "@/stores/auth-store";
 
 const loginSchema = z.object({
@@ -25,6 +25,7 @@ interface LoginResponse {
   usuario: SessionUser;
   requiresPasswordChange: boolean;
   requiresOnboarding: boolean;
+  csrfToken: string;
 }
 
 const MODULOS = [
@@ -65,6 +66,7 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
 
+      setCsrfToken(response.csrfToken);
       setSession(response.usuario);
       router.push("/");
     } catch (error) {
