@@ -53,6 +53,16 @@ const config: Config = {
       fontFamily: {
         display: ["var(--font-display)", "serif"],
       },
+      keyframes: {
+        shimmer: {
+          "0%": { backgroundPosition: "-150% 0" },
+          "100%": { backgroundPosition: "150% 0" },
+        },
+      },
+      animation: {
+        // Brillo sutil del hero del home — solo corre con motion-safe: (respeta prefers-reduced-motion).
+        shimmer: "shimmer 7s ease-in-out infinite",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

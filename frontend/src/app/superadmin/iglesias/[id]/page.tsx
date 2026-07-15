@@ -47,6 +47,12 @@ const ESTADO_LABEL: Record<IglesiaDetalle["estado"], string> = {
   INACTIVA: "Inactiva",
 };
 
+const ESTADO_BADGE_CLASS: Record<IglesiaDetalle["estado"], string> = {
+  ACTIVA: "rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary",
+  SUSPENDIDA: "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700",
+  INACTIVA: "rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground",
+};
+
 function PersonaRow({ nombre, apellido, cargo, email }: { nombre: string; apellido: string; cargo: string; email: string }) {
   return (
     <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
@@ -79,7 +85,11 @@ export default function IglesiaDetallePage() {
   }, [usuario, params.id]);
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   if (usuario.rol !== "SUPER_ADMIN") {
@@ -94,7 +104,7 @@ export default function IglesiaDetallePage() {
   }
 
   return (
-    <main className="h-full bg-background p-8">
+    <main className="h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-3xl">
         <Link
           href="/superadmin"
@@ -136,15 +146,7 @@ export default function IglesiaDetallePage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl font-semibold text-foreground">{data.nombre}</h1>
-                    <span
-                      className={
-                        data.estado === "ACTIVA"
-                          ? "rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary"
-                          : "rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                      }
-                    >
-                      {ESTADO_LABEL[data.estado]}
-                    </span>
+                    <span className={ESTADO_BADGE_CLASS[data.estado]}>{ESTADO_LABEL[data.estado]}</span>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {data.comuna}, {data.region}
@@ -153,7 +155,7 @@ export default function IglesiaDetallePage() {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm sm:grid-cols-3">
+              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Creada</p>
                   <p className="text-foreground">{new Date(data.createdAt).toLocaleDateString("es-CL")}</p>

@@ -1,20 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Bell, Building2, CalendarDays, LayoutDashboard, NotebookPen, Users, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Bell, Building2, Loader2 } from "lucide-react";
 
 import { ProximosEventos } from "@/components/agenda/proximos-eventos";
 import type { Evento } from "@/components/agenda/types";
+import { formatoCLP, type FinanzasDashboard } from "@/components/finanzas/types";
 import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
+import type { UsuarioEquipo } from "@/components/usuarios/types";
+import { useCountUp } from "@/hooks/use-count-up";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, apiFetch } from "@/lib/api";
+import type { DashboardResponse } from "@/app/superadmin/page";
 import { type Rol } from "@/stores/auth-store";
 
 const ROLES_CON_TAREAS = ["PASTOR", "TESORERO", "SECRETARIA"];
 const ROLES_CON_AGENDA = ["PASTOR", "TESORERO", "SECRETARIA"];
+// Mismo criterio de acceso que ya rigen /finanzas (ROLES_CON_ACCESO) y /usuarios (rol === "PASTOR"):
+// las tarjetas de "Resumen" son un preview de esos módulos, no un criterio nuevo.
+const ROLES_CON_BALANCE_CAJA = ["PASTOR", "TESORERO"];
+const ROLES_CON_RESUMEN = ["PASTOR", "TESORERO", "SUPER_ADMIN"];
 
 const ROL_LABEL: Record<Rol, string> = {
   PASTOR: "Pastor",
@@ -24,33 +32,56 @@ const ROL_LABEL: Record<Rol, string> = {
   MIEMBRO: "Miembro",
 };
 
-interface AccesoRapido {
+function ResumenTile({
+  href,
+  label,
+  value,
+  formato = (n: number) => String(n),
+  secondary,
+}: {
   href: string;
   label: string;
-  descripcion: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tint: string;
+  /** Valor numérico crudo — se anima con conteo ascendente al montar/actualizar. */
+  value: number;
+  /** Formatea el valor animado para mostrar (ej. formatoCLP.format). Por defecto, String(). */
+  formato?: (n: number) => string;
+  secondary?: ReactNode;
+}) {
+  const animado = useCountUp(value);
+  return (
+    <Link
+      href={href}
+      className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
+    >
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-foreground">{formato(animado)}</p>
+      {secondary && <p className="mt-1 text-xs text-muted-foreground">{secondary}</p>}
+    </Link>
+  );
 }
 
-const ACCESOS_POR_ROL: Record<Rol, AccesoRapido[]> = {
-  PASTOR: [
-    { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
-    { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" },
-    { href: "/notas", label: "Notas", descripcion: "Recordatorios y tareas pendientes", icon: NotebookPen, tint: "bg-amber-100 text-amber-700" },
-    { href: "/usuarios", label: "Equipo", descripcion: "Tesoreros y secretarias", icon: Users, tint: "bg-violet-100 text-violet-700" },
-  ],
-  TESORERO: [
-    { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
-    { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" },
-  ],
-  SECRETARIA: [
-    { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
-  ],
-  SUPER_ADMIN: [
-    { href: "/superadmin", label: "Dashboard", descripcion: "Iglesias registradas en la plataforma", icon: LayoutDashboard, tint: "bg-sky-100 text-sky-700" },
-  ],
-  MIEMBRO: [],
-};
+/** Comparación de balance vs. el mes calendario anterior — mismo endpoint, sin backend nuevo. */
+function ComparacionBalance({ actual, anterior }: { actual: number; anterior: number | null }) {
+  if (anterior === null || anterior === 0) return null;
+  const cambio = Math.round(((actual - anterior) / Math.abs(anterior)) * 100);
+  const subio = cambio >= 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 font-medium ${subio ? "text-emerald-600" : "text-rose-600"}`}>
+      {subio ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+      {subio ? "+" : ""}
+      {cambio}% vs. mes pasado
+    </span>
+  );
+}
+
+function ResumenTileSkeleton() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="h-4 w-32 rounded bg-muted" />
+      <div className="mt-3 h-7 w-20 rounded bg-muted" />
+    </div>
+  );
+}
 
 function saludoSegunHora(): string {
   const hora = new Date().getHours();
@@ -63,17 +94,31 @@ export default function Home() {
   const { usuario, ready } = useRequireAuth();
 
   const [tareas, setTareas] = useState<Nota[]>([]);
+  const [loadingTareas, setLoadingTareas] = useState(true);
   const [modalTareasOpen, setModalTareasOpen] = useState(false);
   const [eventosProximos, setEventosProximos] = useState<Evento[]>([]);
   const [loadingEventos, setLoadingEventos] = useState(true);
+  const [balanceMes, setBalanceMes] = useState<number | null>(null);
+  const [balanceMesAnterior, setBalanceMesAnterior] = useState<number | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(true);
+  const [miembrosEquipo, setMiembrosEquipo] = useState<number | null>(null);
+  const [loadingMiembros, setLoadingMiembros] = useState(true);
+  const [statsSuperAdmin, setStatsSuperAdmin] = useState<DashboardResponse["totales"] | null>(null);
+  const [loadingStatsSuperAdmin, setLoadingStatsSuperAdmin] = useState(true);
 
   const cargarTareas = useCallback(async () => {
-    if (!usuario || !ROLES_CON_TAREAS.includes(usuario.rol)) return;
+    if (!usuario || !ROLES_CON_TAREAS.includes(usuario.rol)) {
+      setLoadingTareas(false);
+      return;
+    }
+    setLoadingTareas(true);
     try {
       const data = await apiFetch<Nota[]>("/notas/mis-tareas");
       setTareas(data);
     } catch {
       // Si falla, simplemente no se muestra el aviso — no es una acción crítica del usuario.
+    } finally {
+      setLoadingTareas(false);
     }
   }, [usuario]);
 
@@ -101,6 +146,72 @@ export default function Home() {
     }
   }, [usuario]);
 
+  // Mismo rango de mes (primer y último día) que rangoMes() en finanzas/page.tsx.
+  // Además trae el mes calendario anterior (mismo endpoint, segunda llamada) para
+  // mostrar la comparación "+N% vs. mes pasado" — si esa segunda llamada falla,
+  // el balance del mes actual igual se muestra, solo sin la comparación.
+  const cargarBalanceMes = useCallback(async () => {
+    if (!usuario || !ROLES_CON_BALANCE_CAJA.includes(usuario.rol)) {
+      setLoadingBalance(false);
+      return;
+    }
+    setLoadingBalance(true);
+    try {
+      const ahora = new Date();
+      const from = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+      const to = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+      const fromAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+      const toAnterior = new Date(ahora.getFullYear(), ahora.getMonth(), 0, 23, 59, 59);
+
+      const [actual, anterior] = await Promise.all([
+        apiFetch<FinanzasDashboard>(
+          `/finanzas/movimientos/dashboard?from=${from.toISOString()}&to=${to.toISOString()}`,
+        ),
+        apiFetch<FinanzasDashboard>(
+          `/finanzas/movimientos/dashboard?from=${fromAnterior.toISOString()}&to=${toAnterior.toISOString()}`,
+        ).catch(() => null),
+      ]);
+      setBalanceMes(actual.totales.balance);
+      setBalanceMesAnterior(anterior?.totales.balance ?? null);
+    } catch {
+      // Si falla, la tarjeta simplemente no se muestra.
+    } finally {
+      setLoadingBalance(false);
+    }
+  }, [usuario]);
+
+  const cargarMiembrosEquipo = useCallback(async () => {
+    if (!usuario || usuario.rol !== "PASTOR") {
+      setLoadingMiembros(false);
+      return;
+    }
+    setLoadingMiembros(true);
+    try {
+      const data = await apiFetch<UsuarioEquipo[]>("/usuarios");
+      setMiembrosEquipo(data.length);
+    } catch {
+      // Igual que el resto: si falla, la tarjeta no se muestra.
+    } finally {
+      setLoadingMiembros(false);
+    }
+  }, [usuario]);
+
+  const cargarStatsSuperAdmin = useCallback(async () => {
+    if (!usuario || usuario.rol !== "SUPER_ADMIN") {
+      setLoadingStatsSuperAdmin(false);
+      return;
+    }
+    setLoadingStatsSuperAdmin(true);
+    try {
+      const data = await apiFetch<DashboardResponse>("/superadmin/dashboard");
+      setStatsSuperAdmin(data.totales);
+    } catch {
+      // Igual que el resto: si falla, la tarjeta no se muestra.
+    } finally {
+      setLoadingStatsSuperAdmin(false);
+    }
+  }, [usuario]);
+
   useEffect(() => {
     cargarTareas();
   }, [cargarTareas]);
@@ -109,12 +220,28 @@ export default function Home() {
     cargarEventosProximos();
   }, [cargarEventosProximos]);
 
+  useEffect(() => {
+    cargarBalanceMes();
+  }, [cargarBalanceMes]);
+
+  useEffect(() => {
+    cargarMiembrosEquipo();
+  }, [cargarMiembrosEquipo]);
+
+  useEffect(() => {
+    cargarStatsSuperAdmin();
+  }, [cargarStatsSuperAdmin]);
+
   function onTareaActualizada(tarea: Nota) {
     setTareas((prev) => (tarea.estado === "EN_REVISION" ? prev.map((t) => (t.id === tarea.id ? tarea : t)) : prev.filter((t) => t.id !== tarea.id)));
   }
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   const fechaHoy = new Date().toLocaleDateString("es-CL", {
@@ -124,7 +251,10 @@ export default function Home() {
     year: "numeric",
   });
 
-  const accesos = ACCESOS_POR_ROL[usuario.rol] ?? [];
+  const loadingResumen =
+    (ROLES_CON_BALANCE_CAJA.includes(usuario.rol) && loadingBalance) ||
+    (usuario.rol === "PASTOR" && loadingMiembros) ||
+    (usuario.rol === "SUPER_ADMIN" && loadingStatsSuperAdmin);
 
   return (
     <main className="min-h-full bg-background p-4 sm:p-8">
@@ -140,7 +270,40 @@ export default function Home() {
             className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[hsl(var(--accent)/0.5)] blur-3xl"
           />
 
-          <div className="relative flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+          {/* Rayos de luz: cielo abierto — motivo evocador de presencia/calidez, no literal. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-[12%] w-8 rotate-[16deg] bg-[linear-gradient(to_bottom,hsl(var(--primary)/0.22),transparent_70%)] blur-xl"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-[45%] w-6 rotate-[6deg] bg-[linear-gradient(to_bottom,hsl(var(--accent)/0.45),transparent_65%)] blur-xl"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-[70%] w-10 -rotate-[14deg] bg-[linear-gradient(to_bottom,hsl(var(--primary)/0.16),transparent_75%)] blur-xl"
+          />
+
+          {/* Shimmer sutil: barrido de brillo diagonal — solo anima si el usuario no pidió reducir movimiento. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[length:200%_100%] bg-no-repeat bg-[linear-gradient(115deg,transparent_35%,hsl(var(--primary-foreground)/0.3)_50%,transparent_65%)] motion-safe:animate-shimmer"
+          />
+
+          {/* Silueta de cordillera: motivo reconocible del paisaje/iconografía chilena. */}
+          <svg
+            aria-hidden
+            viewBox="0 0 400 100"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-16 w-full sm:h-24"
+          >
+            <path
+              d="M0,100 L0,72 L38,36 L74,58 L112,24 L150,52 L188,18 L228,54 L272,30 L318,56 L358,32 L400,60 L400,100 Z"
+              fill="hsl(var(--primary)/0.12)"
+            />
+          </svg>
+
+          <div className="relative z-10 flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
             <div>
               <p className="font-display text-3xl italic text-primary sm:text-4xl">
                 {saludoSegunHora()}, {usuario.nombre}
@@ -171,48 +334,73 @@ export default function Home() {
           </div>
         </div>
 
-        {tareas.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setModalTareasOpen(true)}
-            className="mt-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm transition-colors hover:bg-amber-100"
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-              <Bell className="h-6 w-6" />
+        {ROLES_CON_TAREAS.includes(usuario.rol) &&
+          (loadingTareas ? (
+            <div className="mt-6 flex w-full animate-pulse items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="h-12 w-12 shrink-0 rounded-full bg-muted" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-48 rounded bg-muted" />
+                <div className="h-3 w-24 rounded bg-muted" />
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-amber-900">
-                Tienes {tareas.length} {tareas.length === 1 ? "tarea" : "tareas"} pendiente{tareas.length === 1 ? "" : "s"}
-              </p>
-              <p className="text-sm text-amber-700">Toca aquí para verlas</p>
-            </div>
-            <ArrowRight className="h-5 w-5 shrink-0 text-amber-700" />
-          </button>
-        )}
+          ) : (
+            tareas.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setModalTareasOpen(true)}
+                className="mt-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm transition-all hover:bg-amber-100 active:scale-[0.98]"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <Bell className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-base font-semibold text-amber-900">
+                    Tienes {tareas.length} {tareas.length === 1 ? "tarea" : "tareas"} pendiente
+                    {tareas.length === 1 ? "" : "s"}
+                  </p>
+                  <p className="text-sm text-amber-700">Toca aquí para verlas</p>
+                </div>
+                <ArrowRight className="h-5 w-5 shrink-0 text-amber-700" />
+              </button>
+            )
+          ))}
 
-        {accesos.length > 0 && (
+        {ROLES_CON_RESUMEN.includes(usuario.rol) && (
           <div className="mt-8">
-            <h2 className="text-sm font-medium text-muted-foreground">Accesos rápidos</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">Resumen</h2>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {accesos.map((acceso) => {
-                const Icon = acceso.icon;
-                return (
-                  <Link
-                    key={acceso.href}
-                    href={acceso.href}
-                    className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${acceso.tint}`}>
-                      <Icon className="h-7 w-7" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-base font-semibold text-foreground">{acceso.label}</p>
-                      <p className="text-sm text-muted-foreground">{acceso.descripcion}</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
-                  </Link>
-                );
-              })}
+              {loadingResumen ? (
+                <>
+                  <ResumenTileSkeleton />
+                  <ResumenTileSkeleton />
+                </>
+              ) : (
+                <>
+                  {ROLES_CON_BALANCE_CAJA.includes(usuario.rol) && balanceMes !== null && (
+                    <ResumenTile
+                      href="/finanzas"
+                      label="Balance de caja (mes actual)"
+                      value={balanceMes}
+                      formato={formatoCLP.format}
+                      secondary={<ComparacionBalance actual={balanceMes} anterior={balanceMesAnterior} />}
+                    />
+                  )}
+                  {usuario.rol === "PASTOR" && miembrosEquipo !== null && (
+                    <ResumenTile href="/usuarios" label="Miembros del equipo" value={miembrosEquipo} />
+                  )}
+                  {usuario.rol === "SUPER_ADMIN" && statsSuperAdmin !== null && (
+                    <>
+                      <ResumenTile
+                        href="/superadmin"
+                        label="Iglesias activas"
+                        value={statsSuperAdmin.iglesiasActivas}
+                        secondary={`de ${statsSuperAdmin.iglesias} registradas`}
+                      />
+                      <ResumenTile href="/superadmin" label="Pastores" value={statsSuperAdmin.pastores} />
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

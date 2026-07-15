@@ -49,6 +49,46 @@ function StatTile({ label, value, tone }: { label: string; value: number; tone?:
   );
 }
 
+/** Tarjeta de un movimiento para la vista mobile (`sm:hidden`) — equivalente en contenido a la fila de tabla. */
+function MovimientoCard({
+  movimiento,
+  onClick,
+  index,
+}: {
+  movimiento: Movimiento;
+  onClick: () => void;
+  index: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
+      className="flex w-full animate-in flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left shadow-sm fade-in slide-in-from-bottom-1 duration-300 transition-all active:scale-[0.98]"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">{movimiento.categoria.nombre}</span>
+        <span
+          className={
+            movimiento.tipo === "INGRESO"
+              ? "shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
+              : "shrink-0 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700"
+          }
+        >
+          {movimiento.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
+        </span>
+      </div>
+      <p className="text-lg font-semibold text-foreground">{formatoCLP.format(Number(movimiento.monto))}</p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span>{new Date(movimiento.fecha).toLocaleDateString("es-CL")}</span>
+        <span>·</span>
+        <span>{MEDIO_PAGO_LABEL[movimiento.medioPago]}</span>
+      </div>
+      {movimiento.descripcion && <p className="text-xs text-muted-foreground">{movimiento.descripcion}</p>}
+    </button>
+  );
+}
+
 function CategoriaBars({ data, colorClass }: { data: { categoria: string; total: number }[]; colorClass: string }) {
   if (data.length === 0) {
     return <p className="text-sm text-muted-foreground">Sin movimientos en este período.</p>;
@@ -60,7 +100,9 @@ function CategoriaBars({ data, colorClass }: { data: { categoria: string; total:
     <div className="space-y-3">
       {data.map((d) => (
         <div key={d.categoria} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 truncate text-sm text-foreground">{d.categoria}</span>
+          <span className="w-28 shrink-0 truncate text-sm text-foreground" title={d.categoria}>
+            {d.categoria}
+          </span>
           <div className="h-4 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className={`h-full rounded-full ${colorClass}`}
@@ -168,7 +210,11 @@ export default function FinanzasPage() {
   }
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   if (!ROLES_CON_ACCESO.includes(usuario.rol)) {
@@ -183,14 +229,14 @@ export default function FinanzasPage() {
   }
 
   return (
-    <main className="h-full bg-background p-8">
+    <main className="h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Finanzas</h1>
             <p className="mt-1 text-sm text-muted-foreground">Ingresos y egresos de la iglesia.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setLogsOpen(true)}>
               <FileClock className="h-4 w-4" />
               Logs
@@ -199,7 +245,7 @@ export default function FinanzasPage() {
               {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Exportar
             </Button>
-            <Button onClick={abrirCreacion}>
+            <Button onClick={abrirCreacion} className="active:scale-[0.98]">
               <Plus className="h-4 w-4" />
               Nuevo movimiento
             </Button>
@@ -215,7 +261,7 @@ export default function FinanzasPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <p className="w-48 text-center text-sm font-medium text-foreground">
+          <p className="min-w-0 flex-1 text-center text-sm font-medium text-foreground sm:flex-none sm:w-48">
             {MESES[mes.getMonth()]} {mes.getFullYear()}
           </p>
           <Button
@@ -269,44 +315,69 @@ export default function FinanzasPage() {
               {movimientos.length === 0 ? (
                 <p className="p-10 text-center text-sm text-muted-foreground">Sin movimientos en este período.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Medio</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {movimientos.map((m) => (
-                      <TableRow key={m.id} className="cursor-pointer" onClick={() => abrirEdicion(m)}>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(m.fecha).toLocaleDateString("es-CL")}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={
-                              m.tipo === "INGRESO"
-                                ? "rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
-                                : "rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700"
-                            }
-                          >
-                            {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{MEDIO_PAGO_LABEL[m.medioPago]}</TableCell>
-                        <TableCell className="text-foreground">{m.categoria.nombre}</TableCell>
-                        <TableCell className="text-muted-foreground">{m.descripcion}</TableCell>
-                        <TableCell className="text-right font-medium text-foreground">
-                          {formatoCLP.format(Number(m.monto))}
-                        </TableCell>
-                      </TableRow>
+                <>
+                  {/* Mobile: lista de tarjetas en vez de tabla con scroll horizontal. */}
+                  <div className="space-y-3 p-4 sm:hidden">
+                    {movimientos.map((m, i) => (
+                      <MovimientoCard key={m.id} movimiento={m} onClick={() => abrirEdicion(m)} index={i} />
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  {/* Desde sm: tabla real. */}
+                  <div className="hidden sm:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Medio</TableHead>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead>Descripción</TableHead>
+                          <TableHead className="text-right">Monto</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {movimientos.map((m, i) => (
+                          <TableRow
+                            key={m.id}
+                            className="animate-in cursor-pointer fade-in slide-in-from-bottom-1 duration-300"
+                            style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => abrirEdicion(m)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                abrirEdicion(m);
+                              }
+                            }}
+                          >
+                            <TableCell className="text-muted-foreground">
+                              {new Date(m.fecha).toLocaleDateString("es-CL")}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={
+                                  m.tipo === "INGRESO"
+                                    ? "rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
+                                    : "rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700"
+                                }
+                              >
+                                {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{MEDIO_PAGO_LABEL[m.medioPago]}</TableCell>
+                            <TableCell className="text-foreground">{m.categoria.nombre}</TableCell>
+                            <TableCell className="text-muted-foreground">{m.descripcion}</TableCell>
+                            <TableCell className="text-right font-medium text-foreground">
+                              {formatoCLP.format(Number(m.monto))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </div>
           </>

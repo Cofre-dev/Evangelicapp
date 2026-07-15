@@ -15,6 +15,10 @@ function formatoFechaLimite(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
 }
 
+function formatoFechaCreacion(iso: string): string {
+  return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function estaVencida(iso: string): boolean {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -28,6 +32,7 @@ function RecordatorioRow({
   onRechazar,
   onEdit,
   procesando,
+  index = 0,
 }: {
   nota: Nota;
   onToggle: (nota: Nota) => void;
@@ -35,11 +40,16 @@ function RecordatorioRow({
   onRechazar: (nota: Nota) => void;
   onEdit: (nota: Nota) => void;
   procesando: boolean;
+  /** Índice dentro de su lista — controla el delay de la entrada escalonada. */
+  index?: number;
 }) {
   const vencida = nota.estado === "PENDIENTE" && nota.fechaLimite !== null && estaVencida(nota.fechaLimite);
 
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/40">
+    <div
+      className="flex animate-in items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm fade-in slide-in-from-bottom-1 duration-300 transition-all hover:bg-muted/40 active:scale-[0.99]"
+      style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
+    >
       {nota.estado === "EN_REVISION" ? (
         <div className="mt-0.5 shrink-0 text-amber-500" title="Esperando tu aprobación">
           <Clock className="h-5 w-5" />
@@ -104,7 +114,13 @@ function RecordatorioRow({
 
       {nota.estado === "EN_REVISION" && (
         <div className="flex shrink-0 gap-1">
-          <Button size="sm" variant="outline" onClick={() => onRechazar(nota)} disabled={procesando}>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label="Rechazar tarea"
+            onClick={() => onRechazar(nota)}
+            disabled={procesando}
+          >
             <X className="h-3.5 w-3.5" />
           </Button>
           <Button size="sm" onClick={() => onAprobar(nota)} disabled={procesando}>
@@ -117,17 +133,27 @@ function RecordatorioRow({
   );
 }
 
-function NotaLargaRow({ nota, onEdit }: { nota: Nota; onEdit: (nota: Nota) => void }) {
+function NotaLargaRow({
+  nota,
+  onEdit,
+  index = 0,
+}: {
+  nota: Nota;
+  onEdit: (nota: Nota) => void;
+  /** Índice dentro de su lista — controla el delay de la entrada escalonada. */
+  index?: number;
+}) {
   return (
     <button
       type="button"
       onClick={() => onEdit(nota)}
-      className="flex w-full items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/40"
+      className="flex w-full animate-in items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm fade-in slide-in-from-bottom-1 duration-300 transition-all hover:bg-muted/40 active:scale-[0.99]"
+      style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
     >
       <NotebookPen className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
       <div>
         <p className="text-sm font-medium text-foreground">{nota.titulo}</p>
-        {nota.descripcion && <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{nota.descripcion}</p>}
+        <p className="mt-0.5 text-xs text-muted-foreground">Creada el {formatoFechaCreacion(nota.createdAt)}</p>
       </div>
     </button>
   );
@@ -197,7 +223,11 @@ export default function NotasPage() {
   }
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   if (usuario.rol !== "PASTOR") {
@@ -218,7 +248,7 @@ export default function NotasPage() {
   const completadas = recordatorios.filter((n) => n.estado === "COMPLETADA");
 
   return (
-    <main className="h-full bg-background p-8">
+    <main className="h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-3xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -230,7 +260,7 @@ export default function NotasPage() {
               <NotebookPen className="h-4 w-4" />
               Nueva nota
             </Button>
-            <Button onClick={() => abrirCreacion("RECORDATORIO")}>
+            <Button onClick={() => abrirCreacion("RECORDATORIO")} className="active:scale-[0.98]">
               <Plus className="h-4 w-4" />
               Nuevo recordatorio
             </Button>
@@ -256,7 +286,7 @@ export default function NotasPage() {
                 <p className="text-sm text-muted-foreground">No tienes pendientes. ¡Vas al día!</p>
               ) : (
                 <div className="space-y-2">
-                  {pendientes.map((nota) => (
+                  {pendientes.map((nota, i) => (
                     <RecordatorioRow
                       key={nota.id}
                       nota={nota}
@@ -265,6 +295,7 @@ export default function NotasPage() {
                       onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
                       onEdit={abrirEdicion}
                       procesando={procesandoId === nota.id}
+                      index={i}
                     />
                   ))}
                 </div>
@@ -275,7 +306,7 @@ export default function NotasPage() {
               <div className="space-y-3">
                 <h2 className="text-sm font-medium text-muted-foreground">Completados ({completadas.length})</h2>
                 <div className="space-y-2">
-                  {completadas.map((nota) => (
+                  {completadas.map((nota, i) => (
                     <RecordatorioRow
                       key={nota.id}
                       nota={nota}
@@ -284,6 +315,7 @@ export default function NotasPage() {
                       onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
                       onEdit={abrirEdicion}
                       procesando={procesandoId === nota.id}
+                      index={i}
                     />
                   ))}
                 </div>
@@ -296,8 +328,8 @@ export default function NotasPage() {
                 <p className="text-sm text-muted-foreground">Todavía no hay notas largas.</p>
               ) : (
                 <div className="space-y-2">
-                  {notasLargas.map((nota) => (
-                    <NotaLargaRow key={nota.id} nota={nota} onEdit={abrirEdicion} />
+                  {notasLargas.map((nota, i) => (
+                    <NotaLargaRow key={nota.id} nota={nota} onEdit={abrirEdicion} index={i} />
                   ))}
                 </div>
               )}

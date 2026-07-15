@@ -35,6 +35,15 @@ export const TIPO_EVENTO_CHIP_CLASS: Record<TipoEvento, string> = {
   OTRO: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
+/** Versión saturada de TIPO_EVENTO_CHIP_CLASS para indicadores pequeños (ej. puntos de
+ * densidad en el calendario mobile) donde el pastel de los chips queda invisible. */
+export const TIPO_EVENTO_DOT_CLASS: Record<TipoEvento, string> = {
+  CULTO: "bg-sky-500",
+  REUNION: "bg-violet-500",
+  LIMPIEZA: "bg-emerald-500",
+  OTRO: "bg-slate-500",
+};
+
 export const ESTADO_PREDICADOR_LABEL: Record<EstadoConfirmacionPredicador, string> = {
   PENDIENTE: "Pendiente",
   CONFIRMADO: "Confirmado",

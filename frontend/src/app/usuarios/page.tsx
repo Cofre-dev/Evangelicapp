@@ -62,7 +62,11 @@ export default function UsuariosPage() {
   }
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   if (usuario.rol !== "PASTOR") {
@@ -77,9 +81,9 @@ export default function UsuariosPage() {
   }
 
   return (
-    <main className="h-full bg-background p-8">
+    <main className="h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-3xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Equipo de la iglesia</h1>
             <p className="mt-1 text-sm text-muted-foreground">Gestiona tesoreros y secretarias de tu iglesia.</p>

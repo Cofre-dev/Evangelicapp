@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import {
@@ -110,6 +111,7 @@ export function EventoDialog({
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const form = useForm<EventoValues>({
     resolver: zodResolver(eventoSchema),
@@ -134,6 +136,7 @@ export function EventoDialog({
     setPredicadoresNuevos([]);
     setNuevoEmail("");
     setNuevoNombre("");
+    setConfirmandoEliminar(false);
 
     if (evento) {
       const inicio = new Date(evento.fechaInicio);
@@ -240,7 +243,34 @@ export function EventoDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-        {step === "conflicto" ? (
+        {confirmandoEliminar ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>¿Eliminar este evento?</DialogTitle>
+              <DialogDescription>Esta acción no se puede deshacer.</DialogDescription>
+            </DialogHeader>
+
+            {serverError && (
+              <Alert variant="destructive">
+                <AlertDescription>{serverError}</AlertDescription>
+              </Alert>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmandoEliminar(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleting}>
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sí, eliminar"}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : step === "conflicto" ? (
           <>
             <DialogHeader>
               <DialogTitle>Ya hay algo agendado a esa hora</DialogTitle>
@@ -395,7 +425,7 @@ export function EventoDialog({
                 <FormItem>
                   <FormLabel>Descripción (opcional)</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Textarea rows={3} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -428,7 +458,7 @@ export function EventoDialog({
                   )
                 ) : (
                   <>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <Input
                         placeholder="Correo del predicador"
                         value={nuevoEmail}
@@ -454,6 +484,7 @@ export function EventoDialog({
                             <span className="text-foreground">{p.nombre || p.email}</span>
                             <button
                               type="button"
+                              aria-label="Quitar predicador"
                               onClick={() => quitarPredicador(i)}
                               className="text-muted-foreground hover:text-destructive"
                             >
@@ -479,7 +510,7 @@ export function EventoDialog({
 
             <DialogFooter className="gap-2 sm:gap-2">
               {esEdicion && (
-                <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
+                <Button type="button" variant="destructive" onClick={() => setConfirmandoEliminar(true)} disabled={deleting}>
                   {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   Eliminar
                 </Button>

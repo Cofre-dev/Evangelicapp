@@ -10,7 +10,11 @@
     --card: 0 0% 100%;
     --card-foreground: 215 28% 24%;
 
-    --primary: 199 84% 62%;
+    /* Antes 62% de luminosidad: fallaba WCAG AA como color de texto/botón
+       (~2.15:1 contra blanco). Bajado a 34% (mismo H/S) para pasar AA en los
+       usos reales del token: texto blanco sobre bg-primary, text-primary
+       sobre blanco/bg-accent y sobre bg-card. Ver frontend/FEATURES.md. */
+    --primary: 199 84% 34%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 200 45% 94%;
@@ -27,7 +31,7 @@
 
     --border: 210 30% 89%;
     --input: 210 30% 89%;
-    --ring: 199 84% 62%;
+    --ring: 199 84% 34%;
 
     --radius: 0.75rem;
   }

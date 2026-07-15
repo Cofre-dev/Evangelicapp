@@ -13,7 +13,7 @@ import { CreateIglesiaDialog } from "@/components/iglesias/create-iglesia-dialog
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 
-interface DashboardResponse {
+export interface DashboardResponse {
   totales: {
     iglesias: number;
     iglesiasActivas: number;
@@ -48,7 +48,9 @@ function RegionBars({ data }: { data: { region: string; cantidad: number }[] }) 
     <div className="space-y-3">
       {data.map((d) => (
         <div key={d.region} className="flex items-center gap-3">
-          <span className="w-32 shrink-0 truncate text-sm text-foreground">{d.region}</span>
+          <span className="w-32 shrink-0 truncate text-sm text-foreground" title={d.region}>
+            {d.region}
+          </span>
           <div className="h-4 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary"
@@ -88,6 +90,12 @@ const ESTADO_LABEL: Record<DashboardResponse["iglesias"][number]["estado"], stri
   INACTIVA: "Inactiva",
 };
 
+const ESTADO_BADGE_CLASS: Record<DashboardResponse["iglesias"][number]["estado"], string> = {
+  ACTIVA: "rounded-full bg-accent px-2 py-1 text-xs font-medium text-primary",
+  SUSPENDIDA: "rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700",
+  INACTIVA: "rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground",
+};
+
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
   const { usuario, ready } = useRequireAuth();
@@ -115,7 +123,11 @@ export default function SuperAdminDashboardPage() {
   }, [loadDashboard]);
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   if (usuario.rol !== "SUPER_ADMIN") {
@@ -130,9 +142,9 @@ export default function SuperAdminDashboardPage() {
   }
 
   return (
-    <main className="h-full bg-background p-8">
+    <main className="h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Dashboard SuperAdmin</h1>
             <p className="mt-1 text-sm text-muted-foreground">Vista global de todas las iglesias de la plataforma.</p>
@@ -192,7 +204,15 @@ export default function SuperAdminDashboardPage() {
                       <TableRow
                         key={iglesia.id}
                         className="cursor-pointer"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => router.push(`/superadmin/iglesias/${iglesia.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            router.push(`/superadmin/iglesias/${iglesia.id}`);
+                          }
+                        }}
                       >
                         <TableCell className="font-medium text-foreground">
                           <div className="flex items-center gap-3">
@@ -210,15 +230,7 @@ export default function SuperAdminDashboardPage() {
                           {new Date(iglesia.createdAt).toLocaleDateString("es-CL")}
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={
-                              iglesia.estado === "ACTIVA"
-                                ? "rounded-full bg-accent px-2 py-1 text-xs font-medium text-primary"
-                                : "rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
-                            }
-                          >
-                            {ESTADO_LABEL[iglesia.estado]}
-                          </span>
+                          <span className={ESTADO_BADGE_CLASS[iglesia.estado]}>{ESTADO_LABEL[iglesia.estado]}</span>
                         </TableCell>
                       </TableRow>
                     ))}

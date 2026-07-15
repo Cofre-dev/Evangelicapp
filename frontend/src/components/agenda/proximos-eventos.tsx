@@ -13,6 +13,24 @@ function formatoHora(iso: string): string {
   return new Date(iso).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Countdown simple del evento más próximo, calculado 100% en cliente sobre datos ya cargados. */
+function formatoCountdown(evento: Evento): string {
+  const ahora = new Date();
+  const inicio = new Date(evento.fechaInicio);
+  const fin = new Date(evento.fechaFin);
+  const horaTexto = formatoHora(evento.fechaInicio);
+
+  if (ahora >= inicio && ahora <= fin) return "En curso ahora";
+
+  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const diaInicio = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+  const diffDias = Math.round((diaInicio.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDias === 0) return `Hoy a las ${horaTexto}`;
+  if (diffDias === 1) return `Mañana a las ${horaTexto}`;
+  return `Faltan ${diffDias} días`;
+}
+
 interface ProximosEventosProps {
   eventos: Evento[];
   loading: boolean;
@@ -22,7 +40,12 @@ export function ProximosEventos({ eventos, loading }: ProximosEventosProps) {
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">Próximos eventos</h2>
+        <div>
+          <h2 className="text-sm font-medium text-muted-foreground">Próximos eventos</h2>
+          {!loading && eventos.length > 0 && (
+            <p className="mt-0.5 text-xs font-medium text-primary">{formatoCountdown(eventos[0])}</p>
+          )}
+        </div>
         <Link href="/agenda" className="text-sm font-medium text-primary hover:underline">
           Ver agenda
         </Link>
@@ -44,8 +67,12 @@ export function ProximosEventos({ eventos, loading }: ProximosEventosProps) {
           </div>
         ) : (
           <ul className="divide-y divide-border">
-            {eventos.map((evento) => (
-              <li key={evento.id} className="flex items-center gap-4 p-4">
+            {eventos.map((evento, i) => (
+              <li
+                key={evento.id}
+                className="flex animate-in items-center gap-4 fade-in slide-in-from-bottom-1 p-4 duration-300"
+                style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
+              >
                 <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-muted py-2">
                   <span className="text-[11px] font-medium uppercase text-muted-foreground">
                     {formatoDiaCorto(evento.fechaInicio)}

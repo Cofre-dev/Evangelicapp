@@ -57,6 +57,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
   const [serverError, setServerError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [equipo, setEquipo] = useState<MiembroEquipo[]>([]);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   const form = useForm<NotaValues>({
     resolver: zodResolver(notaSchema),
@@ -68,6 +69,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
 
     setServerError(null);
     setTipo(nota?.tipo ?? defaultTipo);
+    setConfirmandoEliminar(false);
 
     if (nota) {
       form.reset({
@@ -136,98 +138,12 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {esEdicion ? "Editar" : "Nuevo"} {esRecordatorio ? "recordatorio" : "nota"}
-          </DialogTitle>
-          <DialogDescription>
-            {esRecordatorio ? "Tarea corta con fecha límite, asignable a tu equipo." : "Nota larga de uso personal."}
-          </DialogDescription>
-        </DialogHeader>
-
-        {!esEdicion && (
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant={tipo === "RECORDATORIO" ? "default" : "outline"} onClick={() => setTipo("RECORDATORIO")}>
-              Recordatorio
-            </Button>
-            <Button type="button" variant={tipo === "NOTA" ? "default" : "outline"} onClick={() => setTipo("NOTA")}>
-              Nota larga
-            </Button>
-          </div>
-        )}
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
-            <FormField
-              control={form.control}
-              name="titulo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Título</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Comprar elementos para la cena de confraternidad" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="descripcion"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{esRecordatorio ? "Descripción (opcional)" : "Contenido"}</FormLabel>
-                  <FormControl>
-                    {esRecordatorio ? <Input {...field} /> : <Textarea rows={8} {...field} />}
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {esRecordatorio && (
-              <>
-                <FormField
-                  control={form.control}
-                  name="fechaLimite"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fecha límite (opcional)</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="asignadoAId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Asignar a</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sin asignar" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {opcionesAsignacion.map((miembro) => (
-                            <SelectItem key={miembro.id} value={miembro.id}>
-                              {usuario && miembro.id === usuario.id ? "Yo mismo" : `${miembro.nombre} ${miembro.apellido}`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
-            )}
+        {confirmandoEliminar ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>¿Eliminar {esRecordatorio ? "este recordatorio" : "esta nota"}?</DialogTitle>
+              <DialogDescription>Esta acción no se puede deshacer.</DialogDescription>
+            </DialogHeader>
 
             {serverError && (
               <Alert variant="destructive">
@@ -236,26 +152,143 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
             )}
 
             <DialogFooter className="gap-2 sm:gap-2">
-              {esEdicion && (
-                <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
-                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  Eliminar
-                </Button>
-              )}
-              <Button type="submit" className="flex-1" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : esEdicion ? (
-                  "Guardar cambios"
-                ) : esRecordatorio ? (
-                  "Crear recordatorio"
-                ) : (
-                  "Guardar nota"
-                )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmandoEliminar(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleting}>
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sí, eliminar"}
               </Button>
             </DialogFooter>
-          </form>
-        </Form>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {esEdicion ? "Editar" : "Nuevo"} {esRecordatorio ? "recordatorio" : "nota"}
+              </DialogTitle>
+              <DialogDescription>
+                {esRecordatorio ? "Tarea corta con fecha límite, asignable a tu equipo." : "Nota larga de uso personal."}
+              </DialogDescription>
+            </DialogHeader>
+
+            {!esEdicion && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant={tipo === "RECORDATORIO" ? "default" : "outline"} onClick={() => setTipo("RECORDATORIO")}>
+                  Recordatorio
+                </Button>
+                <Button type="button" variant={tipo === "NOTA" ? "default" : "outline"} onClick={() => setTipo("NOTA")}>
+                  Nota larga
+                </Button>
+              </div>
+            )}
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="titulo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Título</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Comprar elementos para la cena de confraternidad" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="descripcion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{esRecordatorio ? "Descripción (opcional)" : "Contenido"}</FormLabel>
+                      <FormControl>
+                        {esRecordatorio ? <Input {...field} /> : <Textarea rows={8} {...field} />}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {esRecordatorio && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="fechaLimite"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fecha límite (opcional)</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="asignadoAId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Asignar a</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sin asignar" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {opcionesAsignacion.map((miembro) => (
+                                <SelectItem key={miembro.id} value={miembro.id}>
+                                  {usuario && miembro.id === usuario.id ? "Yo mismo" : `${miembro.nombre} ${miembro.apellido}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+
+                {serverError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{serverError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <DialogFooter className="gap-2 sm:gap-2">
+                  {esEdicion && (
+                    <Button type="button" variant="destructive" onClick={() => setConfirmandoEliminar(true)} disabled={deleting}>
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Eliminar
+                    </Button>
+                  )}
+                  <Button type="submit" className="flex-1" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : esEdicion ? (
+                      "Guardar cambios"
+                    ) : esRecordatorio ? (
+                      "Crear recordatorio"
+                    ) : (
+                      "Guardar nota"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

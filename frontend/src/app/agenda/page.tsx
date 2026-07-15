@@ -76,7 +76,11 @@ export default function AgendaPage() {
   }
 
   if (!ready || !usuario) {
-    return null;
+    return (
+      <main className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   if (!ROLES_CON_ACCESO.includes(usuario.rol)) {
@@ -91,9 +95,9 @@ export default function AgendaPage() {
   }
 
   return (
-    <main className="h-full bg-background p-8">
+    <main className="h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Agenda</h1>
             <p className="mt-1 text-sm text-muted-foreground">Cultos, reuniones y actividades de la iglesia.</p>
@@ -113,7 +117,7 @@ export default function AgendaPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <p className="w-48 text-center text-sm font-medium text-foreground">
+          <p className="min-w-0 flex-1 text-center text-sm font-medium text-foreground sm:flex-none sm:w-48">
             {MESES[mes.getMonth()]} {mes.getFullYear()}
           </p>
           <Button
