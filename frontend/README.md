@@ -13,7 +13,6 @@ Aplicación de gestión para iglesias evangélicas en Chile (agenda, finanzas, n
 - Cliente HTTP propio (sin librería externa) en `src/lib/api.ts`
 
 ## Requisitos
-
 - Node.js `>=20.11.0` (ver `.nvmrc`; si usás `nvm`, corré `nvm use`)
 - El backend corriendo en paralelo (repo separado) para que la app funcione más allá de la pantalla de login
 
@@ -72,7 +71,7 @@ src/
 
 ## Roles y dominio
 
-La app es multi-tenant por iglesia. Roles (`Rol` en `auth-store.ts`): `SUPER_ADMIN`, `PASTOR`, `TESORERO`, `SECRETARIA`, `MIEMBRO`. El home (`src/app/page.tsx`) arma los accesos rápidos según rol (`ACCESOS_POR_ROL`). `SUPER_ADMIN` administra iglesias desde `/superadmin`; el resto opera dentro de su propia iglesia (`iglesiaId` en la sesión).
+La app es multi-tenant por iglesia. Roles (`Rol` en `auth-store.ts`): `SUPER_ADMIN`, `PASTOR`, `TESORERO`, `SECRETARIA`. El home (`src/app/page.tsx`) arma los accesos rápidos según rol (`ACCESOS_POR_ROL`). `SUPER_ADMIN` administra iglesias desde `/superadmin`; el resto opera dentro de su propia iglesia (`iglesiaId` en la sesión).
 
 ## Autenticación
 

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} ${playfair.variable}`}>
+      <body className={`${inter.className} ${playfair.variable} antialiased`}>
         <AppShell>{children}</AppShell>
         <ChangePasswordOnboardingModal />
         <PersonalDataOnboardingModal />

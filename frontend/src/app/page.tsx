@@ -51,10 +51,10 @@ function ResumenTile({
   return (
     <Link
       href={href}
-      className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
+      className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
     >
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-foreground">{formato(animado)}</p>
+      <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{formato(animado)}</p>
       {secondary && <p className="mt-1 text-xs text-muted-foreground">{secondary}</p>}
     </Link>
   );
@@ -256,6 +256,13 @@ export default function Home() {
     (usuario.rol === "PASTOR" && loadingMiembros) ||
     (usuario.rol === "SUPER_ADMIN" && loadingStatsSuperAdmin);
 
+  // Cantidad de tarjetas que realmente van a renderizar para este rol, para que el
+  // skeleton no "salte" de tamaño al terminar de cargar (ej. tesorero solo ve 1 tarjeta).
+  const resumenTileCount =
+    (ROLES_CON_BALANCE_CAJA.includes(usuario.rol) ? 1 : 0) +
+    (usuario.rol === "PASTOR" ? 1 : 0) +
+    (usuario.rol === "SUPER_ADMIN" ? 2 : 0);
+
   return (
     <main className="min-h-full bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-4xl">
@@ -318,13 +325,13 @@ export default function Home() {
                   <Image
                     src={`${API_URL}${usuario.iglesia.logoUrl}`}
                     alt={`Logo de ${usuario.iglesia.nombre}`}
-                    width={88}
-                    height={88}
-                    className="h-20 w-20 rounded-full border-4 border-card object-cover shadow-md sm:h-22 sm:w-22"
+                    width={96}
+                    height={96}
+                    className="h-20 w-20 rounded-full border-4 border-card object-cover shadow-md sm:h-24 sm:w-24"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-card bg-primary/15 text-primary shadow-md">
-                    <Building2 className="h-9 w-9" />
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-card bg-primary/15 text-primary shadow-md sm:h-24 sm:w-24">
+                    <Building2 className="h-9 w-9 sm:h-10 sm:w-10" />
                   </div>
                 )}
                 <p className="text-lg font-semibold text-foreground">{usuario.iglesia.nombre}</p>
@@ -348,7 +355,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setModalTareasOpen(true)}
-                className="mt-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm transition-all hover:bg-amber-100 active:scale-[0.98]"
+                className="mt-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm transition-all hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                   <Bell className="h-6 w-6" />
@@ -370,10 +377,7 @@ export default function Home() {
             <h2 className="text-sm font-medium text-muted-foreground">Resumen</h2>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {loadingResumen ? (
-                <>
-                  <ResumenTileSkeleton />
-                  <ResumenTileSkeleton />
-                </>
+                Array.from({ length: resumenTileCount }, (_, i) => <ResumenTileSkeleton key={i} />)
               ) : (
                 <>
                   {ROLES_CON_BALANCE_CAJA.includes(usuario.rol) && balanceMes !== null && (
