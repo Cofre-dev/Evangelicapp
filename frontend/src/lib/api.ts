@@ -16,6 +16,20 @@ type ApiFetchOptions = RequestInit;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const REFRESH_PATH = "/auth/refresh";
 
+// Rutas mutantes públicas, exentas de CSRF en el backend a propósito (no
+// requieren sesión, se autentican con un token de un solo uso en la URL). Si
+// el mismo navegador además tiene una sesión de staff activa (ej. un pastor
+// probando su propio link de QR en otra pestaña), no hay que arrastrar esas
+// requests al circuito de recuperación de csrfToken — no lo necesitan y
+// terminarían mandando a un visitante/staff a /login sin motivo. Confirmado
+// contra el backend real: estas rutas responden sin exigir el header aunque
+// haya cookies de sesión presentes.
+const CSRF_EXEMPT_PATHS = [/^\/integrantes\/registro\//, /^\/agenda\/predicadores\/[^/]+\/responder$/];
+
+function isCsrfExempt(path: string): boolean {
+  return CSRF_EXEMPT_PATHS.some((re) => re.test(path));
+}
+
 // Frontend (Vercel) y backend (Render) están en dominios distintos: el JS no
 // puede leer la cookie `csrf_token` de otro dominio aunque no sea httpOnly,
 // así que el backend manda este valor en el body de /auth/login y
@@ -71,8 +85,27 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   // csrfToken (en memoria) se pierde — si ya hay sesión activa, refrescamos
   // una vez antes de la primera request mutante para conseguir uno nuevo en
   // vez de mandar la request sin header y esperar el 403.
-  if (MUTATING_METHODS.has(method) && !csrfToken && path !== REFRESH_PATH && useAuthStore.getState().usuario) {
-    await refreshSession();
+  //
+  // /auth/refresh también exige X-CSRF-Token (pendiente de que el backend lo
+  // exente), así que este refresh preventivo está condenado a fallar con 403
+  // en este escenario exacto (recarga completa, sin token en memoria). Si
+  // falla, no tiene sentido dejar avanzar la request mutante original hacia
+  // el mismo 403 confuso: se trata como sesión no recuperable, igual que el
+  // caso de 401 más abajo tras un reintento fallido.
+  if (
+    MUTATING_METHODS.has(method) &&
+    !csrfToken &&
+    path !== REFRESH_PATH &&
+    !isCsrfExempt(path) &&
+    useAuthStore.getState().usuario
+  ) {
+    const refreshedPreventivo = await refreshSession();
+    if (!refreshedPreventivo) {
+      setCsrfToken(null);
+      useAuthStore.getState().clearSession();
+      if (typeof window !== "undefined") window.location.href = "/login";
+      throw new ApiError(401, "Tu sesión expiró. Inicia sesión de nuevo.");
+    }
   }
 
   let res = await rawFetch(path, options);

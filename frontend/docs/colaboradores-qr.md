@@ -1,6 +1,8 @@
 # Plan: módulo de Colaboradores + registro por QR + convocatorias (WhatsApp/email)
 
-Estado: **planificado, no implementado**. Decisiones ya tomadas con el fundador (2026-07-08):
+> **Estado (2026-07-23): superado por el módulo "Integrantes"**, implementado con un contrato distinto y más simple (ver `prompt.md` en la raíz del repo y la entrada correspondiente en `FEATURES.md`). Este documento queda como referencia histórica de la idea original — no reflejar su contrato (nombres de entidad, campos, rutas) en código nuevo; el módulo real vive en `src/app/integrantes/` y usa rutas `/integrantes/*`, sin consentimiento/honeypot/baja/convocatorias.
+
+Estado original: **planificado, no implementado**. Decisiones ya tomadas con el fundador (2026-07-08):
 
 - WhatsApp se envía vía **API oficial de WhatsApp Business (Meta Cloud API)** — no las librerías no oficiales (Baileys/whatsapp-web.js), por el riesgo real de baneo del número que eso implica para algo pensado para durar años a nivel nacional.
 - La convocatoria a colaboradores **no es automática**: se dispara con un botón explícito desde el evento, nunca al crear el evento.

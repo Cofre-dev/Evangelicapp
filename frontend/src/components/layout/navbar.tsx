@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2 } from "lucide-react";
+import { Building2, LogOut, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { API_URL, apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type Rol } from "@/stores/auth-store";
 
@@ -16,6 +18,7 @@ const NAV_LINKS: Record<Rol, { href: string; label: string }[]> = {
     { href: "/finanzas", label: "Finanzas" },
     { href: "/notas", label: "Notas" },
     { href: "/usuarios", label: "Equipo" },
+    { href: "/integrantes", label: "Integrantes" },
   ],
   TESORERO: [
     { href: "/", label: "Inicio" },
@@ -25,6 +28,7 @@ const NAV_LINKS: Record<Rol, { href: string; label: string }[]> = {
   SECRETARIA: [
     { href: "/", label: "Inicio" },
     { href: "/agenda", label: "Agenda" },
+    { href: "/integrantes", label: "Integrantes" },
   ],
   SUPER_ADMIN: [
     { href: "/", label: "Inicio" },
@@ -38,8 +42,10 @@ export function Navbar() {
   const router = useRouter();
   const usuario = useAuthStore((state) => state.usuario);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   async function handleLogout() {
+    setMenuAbierto(false);
     try {
       await apiFetch("/auth/logout", { method: "POST" });
     } catch {
@@ -81,29 +87,72 @@ export function Navbar() {
           )}
         </div>
 
-        <nav className="hidden items-center gap-1 md:flex">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={
-                pathname === link.href
-                  ? "rounded-md bg-accent px-3 py-2 text-sm font-medium text-primary"
-                  : "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              }
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
         {usuario && (
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-muted-foreground sm:inline">@{usuario.username}</span>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              Cerrar sesión
-            </Button>
-          </div>
+          <Sheet open={menuAbierto} onOpenChange={setMenuAbierto}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Abrir menú">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="flex w-4/5 flex-col">
+              <SheetHeader>
+                <SheetTitle>Menú</SheetTitle>
+              </SheetHeader>
+
+              <div className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-accent/40 px-3 py-3">
+                {usuario.iglesia?.logoUrl ? (
+                  <Image
+                    src={`${API_URL}${usuario.iglesia.logoUrl}`}
+                    alt={`Logo de ${usuario.iglesia.nombre}`}
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 shrink-0 rounded-full border border-border object-cover"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">@{usuario.username}</p>
+                  {usuario.iglesia && (
+                    <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
+                  )}
+                </div>
+              </div>
+
+              {links.length > 0 && (
+                <nav className="mt-4 flex flex-col gap-1">
+                  {links.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMenuAbierto(false)}
+                      className={
+                        pathname === link.href
+                          ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
+                          : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                      }
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              )}
+
+              <div className="mt-auto border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-center gap-2 text-destructive hover:text-destructive"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Cerrar sesión
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
         )}
       </div>
     </header>

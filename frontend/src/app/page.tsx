@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Bell, Building2, CalendarDays, LayoutDashboard, NotebookPen, Users, Wallet } from "lucide-react";
+import { ArrowRight, Bell, Building2, CalendarDays, LayoutDashboard, NotebookPen, QrCode, Users, Wallet } from "lucide-react";
 
 import { ProximosEventos } from "@/components/agenda/proximos-eventos";
 import type { Evento } from "@/components/agenda/types";
@@ -38,6 +38,7 @@ const ACCESOS_POR_ROL: Record<Rol, AccesoRapido[]> = {
     { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" },
     { href: "/notas", label: "Notas", descripcion: "Recordatorios y tareas pendientes", icon: NotebookPen, tint: "bg-amber-100 text-amber-700" },
     { href: "/usuarios", label: "Equipo", descripcion: "Tesoreros y secretarias", icon: Users, tint: "bg-violet-100 text-violet-700" },
+    { href: "/integrantes", label: "Integrantes", descripcion: "Censo de la congregación por QR", icon: QrCode, tint: "bg-rose-100 text-rose-700" },
   ],
   TESORERO: [
     { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
@@ -45,6 +46,7 @@ const ACCESOS_POR_ROL: Record<Rol, AccesoRapido[]> = {
   ],
   SECRETARIA: [
     { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
+    { href: "/integrantes", label: "Integrantes", descripcion: "Censo de la congregación por QR", icon: QrCode, tint: "bg-rose-100 text-rose-700" },
   ],
   SUPER_ADMIN: [
     { href: "/superadmin", label: "Dashboard", descripcion: "Iglesias registradas en la plataforma", icon: LayoutDashboard, tint: "bg-sky-100 text-sky-700" },

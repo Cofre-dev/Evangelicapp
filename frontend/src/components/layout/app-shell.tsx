@@ -8,7 +8,10 @@ const RUTAS_SIN_SHELL = ["/login"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const ocultarShell = RUTAS_SIN_SHELL.includes(pathname) || pathname.startsWith("/predicacion/");
+  const ocultarShell =
+    RUTAS_SIN_SHELL.includes(pathname) ||
+    pathname.startsWith("/predicacion/") ||
+    pathname.startsWith("/integrantes/registro/");
 
   if (ocultarShell) {
     return <>{children}</>;
