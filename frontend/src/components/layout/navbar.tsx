@@ -1,40 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, LogOut, Menu } from "lucide-react";
+import { Building2, ChevronDown, LogOut, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { API_URL, apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type Rol } from "@/stores/auth-store";
 
-const NAV_LINKS: Record<Rol, { href: string; label: string }[]> = {
+/**
+ * Un ítem de navegación es un link directo o un grupo colapsable con sub-links
+ * (ej. "Ceremonias" ▾, que despliega sus 4 submódulos dentro del propio panel
+ * lateral en vez de navegar a una página propia). Discriminado por `type` para
+ * poder mezclar ambos dentro de la misma lista sin romper los links planos que
+ * ya existían.
+ */
+type NavItem =
+  | { type: "link"; href: string; label: string }
+  | { type: "group"; label: string; children: { href: string; label: string }[] };
+
+const CEREMONIAS_GRUPO: NavItem = {
+  type: "group",
+  label: "Ceremonias",
+  children: [
+    { href: "/ceremonias/matrimonios", label: "Matrimonios" },
+    { href: "/ceremonias/bautizos", label: "Bautizos" },
+    { href: "/ceremonias/defunciones", label: "Defunciones" },
+    { href: "/ceremonias/presentaciones", label: "Presentaciones" },
+  ],
+};
+
+const NAV_LINKS: Record<Rol, NavItem[]> = {
   PASTOR: [
-    { href: "/", label: "Inicio" },
-    { href: "/agenda", label: "Agenda" },
-    { href: "/finanzas", label: "Finanzas" },
-    { href: "/notas", label: "Notas" },
-    { href: "/usuarios", label: "Equipo" },
-    { href: "/integrantes", label: "Integrantes" },
+    { type: "link", href: "/", label: "Inicio" },
+    { type: "link", href: "/agenda", label: "Agenda" },
+    { type: "link", href: "/finanzas", label: "Finanzas" },
+    { type: "link", href: "/notas", label: "Notas" },
+    { type: "link", href: "/usuarios", label: "Equipo" },
+    { type: "link", href: "/integrantes", label: "Integrantes" },
+    CEREMONIAS_GRUPO,
   ],
   TESORERO: [
-    { href: "/", label: "Inicio" },
-    { href: "/agenda", label: "Agenda" },
-    { href: "/finanzas", label: "Finanzas" },
+    { type: "link", href: "/", label: "Inicio" },
+    { type: "link", href: "/agenda", label: "Agenda" },
+    { type: "link", href: "/finanzas", label: "Finanzas" },
   ],
   SECRETARIA: [
-    { href: "/", label: "Inicio" },
-    { href: "/agenda", label: "Agenda" },
-    { href: "/integrantes", label: "Integrantes" },
+    { type: "link", href: "/", label: "Inicio" },
+    { type: "link", href: "/agenda", label: "Agenda" },
+    { type: "link", href: "/integrantes", label: "Integrantes" },
+    CEREMONIAS_GRUPO,
   ],
   SUPER_ADMIN: [
-    { href: "/", label: "Inicio" },
-    { href: "/superadmin", label: "Dashboard" },
+    { type: "link", href: "/", label: "Inicio" },
+    { type: "link", href: "/superadmin", label: "Dashboard" },
   ],
-  MIEMBRO: [{ href: "/", label: "Inicio" }],
+  MIEMBRO: [{ type: "link", href: "/", label: "Inicio" }],
 };
 
 export function Navbar() {
@@ -43,6 +67,34 @@ export function Navbar() {
   const usuario = useAuthStore((state) => state.usuario);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(new Set());
+
+  const links = usuario ? (NAV_LINKS[usuario.rol] ?? []) : [];
+
+  // Si la ruta activa cae dentro de un grupo (ej. entrar directo a
+  // /ceremonias/bautizos), lo expande automáticamente para que quede visible
+  // al abrir el menú — sin esto, un grupo colapsado podría esconder la
+  // sección en la que el usuario ya está parado.
+  useEffect(() => {
+    for (const link of links) {
+      if (link.type === "group" && link.children.some((child) => pathname.startsWith(child.href))) {
+        setGruposAbiertos((prev) => (prev.has(link.label) ? prev : new Set(prev).add(link.label)));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  function toggleGrupo(label: string) {
+    setGruposAbiertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  }
 
   async function handleLogout() {
     setMenuAbierto(false);
@@ -56,8 +108,6 @@ export function Navbar() {
       router.replace("/login");
     }
   }
-
-  const links = usuario ? (NAV_LINKS[usuario.rol] ?? []) : [];
 
   return (
     <header className="border-b border-border bg-card">
@@ -123,20 +173,59 @@ export function Navbar() {
 
               {links.length > 0 && (
                 <nav className="mt-4 flex flex-col gap-1">
-                  {links.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setMenuAbierto(false)}
-                      className={
-                        pathname === link.href
-                          ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
-                          : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                      }
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
+                  {links.map((link) =>
+                    link.type === "group" ? (
+                      <div key={link.label}>
+                        <button
+                          type="button"
+                          onClick={() => toggleGrupo(link.label)}
+                          aria-expanded={gruposAbiertos.has(link.label)}
+                          aria-controls={`grupo-nav-${link.label}`}
+                          className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent/60 hover:text-foreground ${
+                            link.children.some((child) => pathname === child.href)
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {link.label}
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${gruposAbiertos.has(link.label) ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                        {gruposAbiertos.has(link.label) && (
+                          <div id={`grupo-nav-${link.label}`} className="ml-3 mt-1 flex flex-col gap-1 border-l border-border pl-3">
+                            {link.children.map((child) => (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                onClick={() => setMenuAbierto(false)}
+                                className={
+                                  pathname === child.href
+                                    ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
+                                    : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                                }
+                              >
+                                {child.label}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMenuAbierto(false)}
+                        className={
+                          pathname === link.href
+                            ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
+                            : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                        }
+                      >
+                        {link.label}
+                      </Link>
+                    ),
+                  )}
                 </nav>
               )}
 
