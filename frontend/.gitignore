@@ -15,3 +15,7 @@ next-env.d.ts
 # misc
 *.log
 .DS_Store
+../.agents/
+../.claude/
+../.github/
+../skills-lock.json
