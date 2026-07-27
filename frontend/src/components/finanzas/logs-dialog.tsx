@@ -7,7 +7,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import { ACCION_AUDITORIA_LABEL, formatoCLP, MEDIO_PAGO_LABEL, type MovimientoAuditLog } from "./types";
+import {
+  ACCION_AUDITORIA_LABEL,
+  contextoQueryParam,
+  formatoCLP,
+  MEDIO_PAGO_LABEL,
+  type ContextoFinanzas,
+  type MovimientoAuditLog,
+} from "./types";
 
 const ACCION_CLASS: Record<MovimientoAuditLog["accion"], string> = {
   CREACION: "bg-emerald-100 text-emerald-700",
@@ -22,9 +29,10 @@ function formatoFechaHora(iso: string): string {
 interface LogsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contexto: ContextoFinanzas;
 }
 
-export function LogsDialog({ open, onOpenChange }: LogsDialogProps) {
+export function LogsDialog({ open, onOpenChange, contexto }: LogsDialogProps) {
   const usuario = useAuthStore((state) => state.usuario);
   const [logs, setLogs] = useState<MovimientoAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +43,12 @@ export function LogsDialog({ open, onOpenChange }: LogsDialogProps) {
     setLoading(true);
     setError(null);
 
-    apiFetch<MovimientoAuditLog[]>("/finanzas/movimientos/logs")
+    apiFetch<MovimientoAuditLog[]>(`/finanzas/movimientos/logs?${contextoQueryParam(contexto)}`)
       .then(setLogs)
       .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudieron cargar los logs"))
       .finally(() => setLoading(false));
-  }, [open, usuario]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, usuario, contexto.tipo, contexto.tipo === "departamento" ? contexto.id : null]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,7 +88,7 @@ export function LogsDialog({ open, onOpenChange }: LogsDialogProps) {
                 </div>
                 <p className="mt-1 text-muted-foreground">
                   {log.snapshot.categoria} · {formatoCLP.format(log.snapshot.monto)} ·{" "}
-                  {MEDIO_PAGO_LABEL[log.snapshot.medioPago]}
+                  {MEDIO_PAGO_LABEL[log.snapshot.medioPago]} · {log.snapshot.departamento ?? "Finanzas general"}
                   {log.snapshot.descripcion && ` · ${log.snapshot.descripcion}`}
                 </p>
               </div>

@@ -1,15 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Download, FileClock, Loader2, Plus } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileClock, Loader2, Plus, Upload } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DepartamentoSelector } from "@/components/finanzas/departamento-selector";
+import { ImportarMovimientosDialog } from "@/components/finanzas/importar-movimientos-dialog";
 import { LogsDialog } from "@/components/finanzas/logs-dialog";
 import { MovimientoDialog } from "@/components/finanzas/movimiento-dialog";
-import { formatoCLP, MEDIO_PAGO_LABEL, type Categoria, type FinanzasDashboard, type Movimiento } from "@/components/finanzas/types";
+import {
+  contextoQueryParam,
+  formatoCLP,
+  MEDIO_PAGO_LABEL,
+  type Categoria,
+  type ContextoFinanzas,
+  type Departamento,
+  type FinanzasDashboard,
+  type Movimiento,
+} from "@/components/finanzas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 
@@ -76,20 +88,41 @@ function CategoriaBars({ data, colorClass }: { data: { categoria: string; total:
   );
 }
 
-export default function FinanzasPage() {
+function CargandoFinanzas() {
+  return (
+    <main className="flex h-full items-center justify-center bg-background p-8">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Cargando...
+      </div>
+    </main>
+  );
+}
+
+function FinanzasContent() {
   const { usuario, ready } = useRequireAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const departamentoIdParam = searchParams.get("departamentoId");
+
+  const contexto: ContextoFinanzas = useMemo(
+    () => (departamentoIdParam ? { tipo: "departamento", id: departamentoIdParam } : { tipo: "general" }),
+    [departamentoIdParam],
+  );
 
   const [mes, setMes] = useState(() => new Date());
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [dashboard, setDashboard] = useState<FinanzasDashboard | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [exportando, setExportando] = useState(false);
+  const [exportando, setExportando] = useState<"actual" | "consolidado" | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<Movimiento | null>(null);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [importarOpen, setImportarOpen] = useState(false);
 
   const rangoMes = useCallback(() => {
     const from = new Date(mes.getFullYear(), mes.getMonth(), 1);
@@ -103,14 +136,24 @@ export default function FinanzasPage() {
     setError(null);
 
     const { from, to } = rangoMes();
-    const query = `from=${from.toISOString()}&to=${to.toISOString()}`;
+    const rangoQuery = `from=${from.toISOString()}&to=${to.toISOString()}`;
+    const contextoQuery = contextoQueryParam(contexto);
+    // El dashboard de "Finanzas general" (sin departamento seleccionado) suma
+    // TODA la plata de la iglesia (general + departamentos) y trae el
+    // desglose `porDepartamento` — a propósito no manda `general=true`, a
+    // diferencia de movimientos/categorías/logs, que sí quedan acotados al
+    // libro general (ver frontend/prompt.md sección 1.4).
+    const dashboardQuery =
+      contexto.tipo === "general" ? rangoQuery : `${rangoQuery}&departamentoId=${contexto.id}`;
 
     try {
-      const [dashboardData, movimientosData, categoriasData] = await Promise.all([
-        apiFetch<FinanzasDashboard>(`/finanzas/movimientos/dashboard?${query}`),
-        apiFetch<Movimiento[]>(`/finanzas/movimientos?${query}`),
-        apiFetch<Categoria[]>("/finanzas/categorias"),
+      const [departamentosData, dashboardData, movimientosData, categoriasData] = await Promise.all([
+        apiFetch<Departamento[]>("/finanzas/departamentos?incluirInactivos=true"),
+        apiFetch<FinanzasDashboard>(`/finanzas/movimientos/dashboard?${dashboardQuery}`),
+        apiFetch<Movimiento[]>(`/finanzas/movimientos?${rangoQuery}&${contextoQuery}`),
+        apiFetch<Categoria[]>(`/finanzas/categorias?${contextoQuery}`),
       ]);
+      setDepartamentos(departamentosData);
       setDashboard(dashboardData);
       setMovimientos(movimientosData);
       setCategorias(categoriasData);
@@ -119,11 +162,17 @@ export default function FinanzasPage() {
     } finally {
       setLoading(false);
     }
-  }, [usuario, rangoMes]);
+    // `contexto` se resume en su representación de query, no como objeto (cambia de identidad en cada render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, rangoMes, contexto.tipo, contexto.tipo === "departamento" ? contexto.id : null]);
 
   useEffect(() => {
     loadDatos();
   }, [loadDatos]);
+
+  const departamentosActivos = departamentos.filter((d) => d.activo);
+  const departamentoActual = contexto.tipo === "departamento" ? departamentos.find((d) => d.id === contexto.id) ?? null : null;
+  const departamentoNoEncontrado = contexto.tipo === "departamento" && !loading && departamentos.length > 0 && !departamentoActual;
 
   function abrirCreacion() {
     setMovimientoSeleccionado(null);
@@ -139,32 +188,45 @@ export default function FinanzasPage() {
     setCategorias((prev) => [...prev, categoria]);
   }
 
-  async function exportarExcel() {
-    if (!usuario) return;
-    setExportando(true);
+  async function descargarExportacion(query: string, nombreArchivo: string, tipo: "actual" | "consolidado") {
+    setExportando(tipo);
     setError(null);
 
     try {
-      const { from, to } = rangoMes();
-      const res = await fetch(
-        `${API_URL}/finanzas/movimientos/exportar?from=${from.toISOString()}&to=${to.toISOString()}`,
-        { credentials: "include" },
-      );
-
+      const res = await fetch(`${API_URL}/finanzas/movimientos/exportar?${query}`, { credentials: "include" });
       if (!res.ok) throw new Error();
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `movimientos-${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, "0")}.xlsx`;
+      a.download = nombreArchivo;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
       setError("No se pudo exportar el archivo");
     } finally {
-      setExportando(false);
+      setExportando(null);
     }
+  }
+
+  function exportarActual() {
+    const { from, to } = rangoMes();
+    const rangoQuery = `from=${from.toISOString()}&to=${to.toISOString()}`;
+    const sufijo = mes.getFullYear() + "-" + String(mes.getMonth() + 1).padStart(2, "0");
+    const nombreDestino = contexto.tipo === "general" ? "general" : (departamentoActual?.nombre ?? "departamento");
+    descargarExportacion(
+      `${rangoQuery}&${contextoQueryParam(contexto)}`,
+      `movimientos-${nombreDestino}-${sufijo}.xlsx`,
+      "actual",
+    );
+  }
+
+  function exportarConsolidado() {
+    const { from, to } = rangoMes();
+    const rangoQuery = `from=${from.toISOString()}&to=${to.toISOString()}`;
+    const sufijo = mes.getFullYear() + "-" + String(mes.getMonth() + 1).padStart(2, "0");
+    descargarExportacion(rangoQuery, `movimientos-consolidado-${sufijo}.xlsx`, "consolidado");
   }
 
   if (!ready || !usuario) {
@@ -182,28 +244,75 @@ export default function FinanzasPage() {
     );
   }
 
+  const nombreContextoActual = contexto.tipo === "general" ? "Finanzas general" : (departamentoActual?.nombre ?? "departamento");
+  const archivado = Boolean(departamentoActual && !departamentoActual.activo);
+
   return (
     <main className="h-full bg-background p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Finanzas</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Ingresos y egresos de la iglesia.</p>
+            <h1 className="text-xl font-semibold text-foreground">
+              {contexto.tipo === "general" ? "Finanzas" : `Finanzas — ${nombreContextoActual}`}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {contexto.tipo === "general"
+                ? "Ingresos y egresos de la iglesia."
+                : `Ingresos y egresos del departamento ${nombreContextoActual}.`}
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setLogsOpen(true)}>
-              <FileClock className="h-4 w-4" />
-              Logs
-            </Button>
-            <Button variant="outline" onClick={exportarExcel} disabled={exportando}>
-              {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Exportar
-            </Button>
+          <DepartamentoSelector
+            departamentosActivos={departamentosActivos}
+            contexto={contexto}
+            esPastor={usuario.rol === "PASTOR"}
+          />
+        </div>
+
+        {archivado && (
+          <Alert className="mt-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Este departamento está archivado: se conserva su historial, pero no se pueden agregar movimientos
+              nuevos. Puedes reactivarlo desde &ldquo;Gestionar departamentos&rdquo;.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {departamentoNoEncontrado && (
+          <Alert variant="destructive" className="mt-6">
+            <AlertDescription>
+              Este departamento ya no existe.{" "}
+              <Link href="/finanzas" className="underline">
+                Volver a Finanzas general
+              </Link>
+              .
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setLogsOpen(true)}>
+            <FileClock className="h-4 w-4" />
+            Logs
+          </Button>
+          <Button variant="outline" onClick={() => setImportarOpen(true)}>
+            <Upload className="h-4 w-4" />
+            Importar
+          </Button>
+          <Button variant="outline" onClick={exportarConsolidado} disabled={exportando !== null}>
+            {exportando === "consolidado" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Exportar todo consolidado
+          </Button>
+          <Button variant="outline" onClick={exportarActual} disabled={exportando !== null}>
+            {exportando === "actual" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Exportar {nombreContextoActual}
+          </Button>
+          {!archivado && (
             <Button onClick={abrirCreacion}>
               <Plus className="h-4 w-4" />
               Nuevo movimiento
             </Button>
-          </div>
+          )}
         </div>
 
         <div className="mt-6 flex items-center justify-center gap-4">
@@ -262,6 +371,34 @@ export default function FinanzasPage() {
               </div>
             </div>
 
+            {/* Solo en "Finanzas general": si se filtró por un departamento puntual, el
+                backend igual devuelve `porDepartamento` con un solo elemento (ese
+                departamento) cuyos números son idénticos a `totales` — pintarlo ahí
+                sería un desglose redundante de un solo renglón (ver frontend/prompt.md). */}
+            {contexto.tipo === "general" && dashboard.porDepartamento && dashboard.porDepartamento.length > 0 && (
+              <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="text-sm font-medium text-foreground">Desglose por departamento</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Aporte de cada departamento al total de arriba (informativo).
+                </p>
+                <div className="mt-4 space-y-2">
+                  {dashboard.porDepartamento.map((d) => (
+                    <div
+                      key={d.departamentoId}
+                      className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm"
+                    >
+                      <span className="font-medium text-foreground">{d.nombre}</span>
+                      <div className="flex gap-4 text-right">
+                        <span className="text-emerald-600">{formatoCLP.format(d.ingresos)}</span>
+                        <span className="text-amber-600">{formatoCLP.format(d.egresos)}</span>
+                        <span className="font-medium text-foreground">{formatoCLP.format(d.balance)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 rounded-2xl border border-border bg-card shadow-sm">
               <div className="p-6 pb-0">
                 <h2 className="text-sm font-medium text-foreground">Movimientos</h2>
@@ -318,12 +455,29 @@ export default function FinanzasPage() {
         onOpenChange={setDialogOpen}
         movimiento={movimientoSeleccionado}
         categorias={categorias}
+        contexto={contexto}
         onCategoriaCreada={agregarCategoria}
         onSaved={loadDatos}
         onDeleted={loadDatos}
       />
 
-      <LogsDialog open={logsOpen} onOpenChange={setLogsOpen} />
+      <LogsDialog open={logsOpen} onOpenChange={setLogsOpen} contexto={contexto} />
+
+      <ImportarMovimientosDialog
+        open={importarOpen}
+        onOpenChange={setImportarOpen}
+        departamentosActivos={departamentosActivos}
+        contextoInicial={contexto}
+        onImportado={loadDatos}
+      />
     </main>
+  );
+}
+
+export default function FinanzasPage() {
+  return (
+    <Suspense fallback={<CargandoFinanzas />}>
+      <FinanzasContent />
+    </Suspense>
   );
 }

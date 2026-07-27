@@ -6,6 +6,11 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    // Body crudo de la respuesta de error — la mayoría de los llamadores solo
+    // necesita `message`, pero algunos endpoints (ej. import de movimientos)
+    // devuelven estructura adicional en el 4xx (ej. `errores: {fila, mensaje}[]`)
+    // que no cabe en un string.
+    public readonly body?: unknown,
   ) {
     super(message);
   }
@@ -24,7 +29,11 @@ const REFRESH_PATH = "/auth/refresh";
 // terminarían mandando a un visitante/staff a /login sin motivo. Confirmado
 // contra el backend real: estas rutas responden sin exigir el header aunque
 // haya cookies de sesión presentes.
-const CSRF_EXEMPT_PATHS = [/^\/integrantes\/registro\//, /^\/agenda\/predicadores\/[^/]+\/responder$/];
+const CSRF_EXEMPT_PATHS = [
+  /^\/integrantes\/registro\//,
+  /^\/agenda\/predicadores\/[^/]+\/responder$/,
+  /^\/agenda\/asistencias\/[^/]+\/responder$/,
+];
 
 function isCsrfExempt(path: string): boolean {
   return CSRF_EXEMPT_PATHS.some((re) => re.test(path));
@@ -124,7 +133,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     const message = Array.isArray(body?.message) ? body.message.join(", ") : body?.message;
-    throw new ApiError(res.status, message ?? "Ocurrió un error inesperado");
+    throw new ApiError(res.status, message ?? "Ocurrió un error inesperado", body);
   }
 
   if (res.status === 204) {

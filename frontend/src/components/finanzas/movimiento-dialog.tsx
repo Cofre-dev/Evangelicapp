@@ -14,7 +14,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatoCLP, MEDIO_PAGO_LABEL, type Categoria, type MedioPago, type Movimiento, type TipoMovimiento } from "./types";
+import {
+  formatoCLP,
+  MEDIO_PAGO_LABEL,
+  type Categoria,
+  type ContextoFinanzas,
+  type MedioPago,
+  type Movimiento,
+  type TipoMovimiento,
+} from "./types";
 
 const movimientoSchema = z.object({
   categoriaId: z.string().min(1, "Selecciona una categoría"),
@@ -47,6 +55,9 @@ interface MovimientoDialogProps {
   onOpenChange: (open: boolean) => void;
   movimiento?: Movimiento | null;
   categorias: Categoria[];
+  /** Destino donde se crea el movimiento/categoría nueva — el departamento de
+   * un movimiento existente es inmutable, así que solo se usa al crear. */
+  contexto: ContextoFinanzas;
   onCategoriaCreada: (categoria: Categoria) => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -57,6 +68,7 @@ export function MovimientoDialog({
   onOpenChange,
   movimiento,
   categorias,
+  contexto,
   onCategoriaCreada,
   onSaved,
   onDeleted,
@@ -141,7 +153,11 @@ export function MovimientoDialog({
     try {
       const nueva = await apiFetch<Categoria>("/finanzas/categorias", {
         method: "POST",
-        body: JSON.stringify({ nombre: nombreNuevaCategoria.trim(), tipo }),
+        body: JSON.stringify({
+          nombre: nombreNuevaCategoria.trim(),
+          tipo,
+          ...(contexto.tipo === "departamento" ? { departamentoId: contexto.id } : {}),
+        }),
       });
 
       setCategoriasLocal((prev) => [...prev, nueva]);
@@ -166,6 +182,9 @@ export function MovimientoDialog({
       fecha: new Date(`${values.fecha}T00:00:00`).toISOString(),
       descripcion: values.descripcion,
       medioPago,
+      // El departamento de un movimiento es inmutable tras crearlo — solo se
+      // manda al crear, nunca en el PATCH de edición.
+      ...(!esEdicion && contexto.tipo === "departamento" ? { departamentoId: contexto.id } : {}),
     };
 
     await apiFetch(esEdicion ? `/finanzas/movimientos/${movimiento!.id}` : "/finanzas/movimientos", {
