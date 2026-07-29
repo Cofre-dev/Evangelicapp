@@ -10,6 +10,7 @@ export interface SessionUser {
   nombre: string;
   apellido: string;
   telefono: string | null;
+  fotoUrl: string | null;
   rol: Rol;
   iglesiaId: string | null;
   iglesia: { nombre: string; logoUrl: string | null } | null;

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ApiError, apiFetch } from "@/lib/api";
+import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import {
   ACCION_AUDITORIA_LABEL,
@@ -37,6 +38,31 @@ export function LogsDialog({ open, onOpenChange, contexto }: LogsDialogProps) {
   const [logs, setLogs] = useState<MovimientoAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState<"actual" | "consolidado" | null>(null);
+
+  async function descargarLogs(query: string, tipo: "actual" | "consolidado") {
+    setDescargando(tipo);
+    setError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/finanzas/movimientos/logs/exportar${query ? `?${query}` : ""}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error();
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "logs-auditoria.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("No se pudo descargar el archivo");
+    } finally {
+      setDescargando(null);
+    }
+  }
 
   useEffect(() => {
     if (!open || !usuario) return;
@@ -57,6 +83,33 @@ export function LogsDialog({ open, onOpenChange, contexto }: LogsDialogProps) {
           <DialogTitle>Historial de movimientos</DialogTitle>
           <DialogDescription>Quién agregó, editó o eliminó cada ingreso o egreso.</DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => descargarLogs(contextoQueryParam(contexto), "actual")}
+            disabled={descargando !== null}
+          >
+            {descargando === "actual" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Descargar logs
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => descargarLogs("", "consolidado")}
+            disabled={descargando !== null}
+          >
+            {descargando === "consolidado" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Descargar todo consolidado
+          </Button>
+        </div>
 
         {error && (
           <Alert variant="destructive">

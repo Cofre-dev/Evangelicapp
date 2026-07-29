@@ -112,6 +112,13 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
     const file = event.target.files?.[0] ?? null;
     setLogoError(null);
 
+    if (file && file.type !== "image/png") {
+      setLogoError("El logo debe ser PNG");
+      event.target.value = "";
+      setLogoFile(null);
+      return;
+    }
+
     if (file && file.size > MAX_LOGO_SIZE_BYTES) {
       setLogoError("El logo no puede superar 2MB");
       event.target.value = "";
@@ -309,14 +316,10 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
 
                     <div className="space-y-2">
                       <Label htmlFor="logo">Logo (opcional)</Label>
-                      <Input
-                        id="logo"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={handleLogoChange}
-                      />
+                      <Input id="logo" type="file" accept="image/png" onChange={handleLogoChange} />
                       <p className="text-xs text-muted-foreground">
-                        El pastor y su equipo lo verán en su pantalla principal junto al nombre de la iglesia.
+                        Solo PNG, máximo 2MB. El pastor y su equipo lo verán en su pantalla principal junto al
+                        nombre de la iglesia.
                       </p>
                       {logoError && <p className="text-sm font-medium text-destructive">{logoError}</p>}
                     </div>

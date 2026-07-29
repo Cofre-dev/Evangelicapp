@@ -37,7 +37,7 @@ const ACCESOS_POR_ROL: Record<Rol, AccesoRapido[]> = {
     { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
     { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" },
     { href: "/notas", label: "Notas", descripcion: "Recordatorios y tareas pendientes", icon: NotebookPen, tint: "bg-amber-100 text-amber-700" },
-    { href: "/usuarios", label: "Equipo", descripcion: "Tesoreros y secretarias", icon: Users, tint: "bg-violet-100 text-violet-700" },
+    { href: "/equipo", label: "Equipo", descripcion: "Tu equipo pastoral, con foto", icon: Users, tint: "bg-violet-100 text-violet-700" },
     { href: "/integrantes", label: "Integrantes", descripcion: "Censo de la congregación por QR", icon: QrCode, tint: "bg-rose-100 text-rose-700" },
   ],
   TESORERO: [

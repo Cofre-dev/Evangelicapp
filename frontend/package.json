@@ -40,6 +40,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.0.3",
     "postcss": "^8.4.45",
+    "sonarqube-scanner": "^5.0.0",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4"
   }

@@ -33,32 +33,44 @@ const CEREMONIAS_GRUPO: NavItem = {
   ],
 };
 
+// "Mi perfil" aplica a cualquier rol autenticado (ver frontend/prompt.md,
+// sección 1) — se agrega al final de la lista de cada rol en vez de vivir en
+// un lugar especial de la barra, mismo criterio de link plano que el resto.
+const PERFIL_LINK: NavItem = { type: "link", href: "/perfil", label: "Mi perfil" };
+
 const NAV_LINKS: Record<Rol, NavItem[]> = {
   PASTOR: [
     { type: "link", href: "/", label: "Inicio" },
     { type: "link", href: "/agenda", label: "Agenda" },
     { type: "link", href: "/finanzas", label: "Finanzas" },
     { type: "link", href: "/notas", label: "Notas" },
-    { type: "link", href: "/usuarios", label: "Equipo" },
+    { type: "link", href: "/equipo", label: "Equipo" },
     { type: "link", href: "/integrantes", label: "Integrantes" },
     CEREMONIAS_GRUPO,
+    { type: "link", href: "/mi-iglesia", label: "Mi iglesia" },
+    PERFIL_LINK,
   ],
   TESORERO: [
     { type: "link", href: "/", label: "Inicio" },
     { type: "link", href: "/agenda", label: "Agenda" },
     { type: "link", href: "/finanzas", label: "Finanzas" },
+    { type: "link", href: "/equipo", label: "Equipo" },
+    PERFIL_LINK,
   ],
   SECRETARIA: [
     { type: "link", href: "/", label: "Inicio" },
     { type: "link", href: "/agenda", label: "Agenda" },
     { type: "link", href: "/integrantes", label: "Integrantes" },
     CEREMONIAS_GRUPO,
+    { type: "link", href: "/equipo", label: "Equipo" },
+    PERFIL_LINK,
   ],
   SUPER_ADMIN: [
     { type: "link", href: "/", label: "Inicio" },
     { type: "link", href: "/superadmin", label: "Dashboard" },
+    PERFIL_LINK,
   ],
-  MIEMBRO: [{ type: "link", href: "/", label: "Inicio" }],
+  MIEMBRO: [{ type: "link", href: "/", label: "Inicio" }, PERFIL_LINK],
 };
 
 export function Navbar() {
