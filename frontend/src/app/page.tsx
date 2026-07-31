@@ -11,15 +11,22 @@ import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, apiFetch } from "@/lib/api";
-import { type Rol } from "@/stores/auth-store";
+import { type Rol, type SessionUser } from "@/stores/auth-store";
 
-const ROLES_CON_TAREAS = ["PASTOR", "TESORERO", "SECRETARIA"];
-const ROLES_CON_AGENDA = ["PASTOR", "TESORERO", "SECRETARIA"];
+/** Ver frontend/prompt.md: cualquier USUARIO (tenga o no módulos otorgados)
+ * puede ver/marcar sus propias tareas asignadas — no depende de `modulos`. */
+function tieneAccesoTareas(usuario: SessionUser): boolean {
+  return usuario.rol === "MANAGER" || usuario.rol === "USUARIO";
+}
+
+/** AGENDA es uno de los 4 módulos delegables (ver frontend/prompt.md). */
+function tieneAccesoAgenda(usuario: SessionUser): boolean {
+  return usuario.rol === "MANAGER" || usuario.modulos.includes("AGENDA");
+}
 
 const ROL_LABEL: Record<Rol, string> = {
-  PASTOR: "Pastor",
-  TESORERO: "Tesorero",
-  SECRETARIA: "Secretaria",
+  MANAGER: "Manager",
+  USUARIO: "Usuario",
   SUPER_ADMIN: "Administrador",
   MIEMBRO: "Miembro",
 };
@@ -32,27 +39,46 @@ interface AccesoRapido {
   tint: string;
 }
 
-const ACCESOS_POR_ROL: Record<Rol, AccesoRapido[]> = {
-  PASTOR: [
-    { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
-    { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" },
-    { href: "/notas", label: "Notas", descripcion: "Recordatorios y tareas pendientes", icon: NotebookPen, tint: "bg-amber-100 text-amber-700" },
-    { href: "/equipo", label: "Equipo", descripcion: "Tu equipo pastoral, con foto", icon: Users, tint: "bg-violet-100 text-violet-700" },
-    { href: "/integrantes", label: "Integrantes", descripcion: "Censo de la congregación por QR", icon: QrCode, tint: "bg-rose-100 text-rose-700" },
-  ],
-  TESORERO: [
-    { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
-    { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" },
-  ],
-  SECRETARIA: [
-    { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" },
-    { href: "/integrantes", label: "Integrantes", descripcion: "Censo de la congregación por QR", icon: QrCode, tint: "bg-rose-100 text-rose-700" },
-  ],
-  SUPER_ADMIN: [
-    { href: "/superadmin", label: "Dashboard", descripcion: "Iglesias registradas en la plataforma", icon: LayoutDashboard, tint: "bg-sky-100 text-sky-700" },
-  ],
-  MIEMBRO: [],
+const ACCESO_AGENDA: AccesoRapido = { href: "/agenda", label: "Agenda", descripcion: "Cultos, reuniones y actividades", icon: CalendarDays, tint: "bg-sky-100 text-sky-700" };
+const ACCESO_FINANZAS: AccesoRapido = { href: "/finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y balance", icon: Wallet, tint: "bg-emerald-100 text-emerald-700" };
+const ACCESO_NOTAS: AccesoRapido = { href: "/notas", label: "Notas", descripcion: "Recordatorios y tareas pendientes", icon: NotebookPen, tint: "bg-amber-100 text-amber-700" };
+const ACCESO_EQUIPO: AccesoRapido = { href: "/equipo", label: "Equipo", descripcion: "Tu equipo pastoral, con foto", icon: Users, tint: "bg-violet-100 text-violet-700" };
+const ACCESO_INTEGRANTES: AccesoRapido = { href: "/integrantes", label: "Integrantes", descripcion: "Censo de la congregación por QR", icon: QrCode, tint: "bg-rose-100 text-rose-700" };
+const ACCESO_DASHBOARD: AccesoRapido = { href: "/superadmin", label: "Dashboard", descripcion: "Iglesias registradas en la plataforma", icon: LayoutDashboard, tint: "bg-sky-100 text-sky-700" };
+
+/**
+ * Accesos rápidos por módulo delegable — igual que en el navbar
+ * (`MODULO_NAV_ITEM`), CEREMONIAS queda fuera porque no tiene una única
+ * pantalla de destino (4 submódulos, sin vista combinada, ver
+ * frontend/prompt.md sección 10 y la entrada de Ceremonias en FEATURES.md).
+ */
+const MODULO_ACCESO_RAPIDO: Partial<Record<string, AccesoRapido>> = {
+  AGENDA: ACCESO_AGENDA,
+  FINANZAS: ACCESO_FINANZAS,
+  INTEGRANTES: ACCESO_INTEGRANTES,
 };
+
+const ORDEN_MODULOS_ACCESOS = ["AGENDA", "FINANZAS", "INTEGRANTES"];
+
+/** MANAGER ve siempre los mismos accesos de trabajo diario (Notas/Equipo son
+ * exclusivos suyos, no delegables); un USUARIO solo ve los módulos que el
+ * MANAGER le otorgó. Accesos/Mi iglesia/Perfil no aparecen acá a propósito,
+ * igual que antes: esta grilla es solo para módulos de trabajo diario, no de
+ * configuración de cuenta (ver entrada 2026-07-27 de FEATURES.md). */
+function buildAccesos(usuario: SessionUser): AccesoRapido[] {
+  if (usuario.rol === "MANAGER") {
+    return [ACCESO_AGENDA, ACCESO_FINANZAS, ACCESO_NOTAS, ACCESO_EQUIPO, ACCESO_INTEGRANTES];
+  }
+  if (usuario.rol === "USUARIO") {
+    return ORDEN_MODULOS_ACCESOS.filter((modulo) => usuario.modulos.includes(modulo)).map(
+      (modulo) => MODULO_ACCESO_RAPIDO[modulo]!,
+    );
+  }
+  if (usuario.rol === "SUPER_ADMIN") {
+    return [ACCESO_DASHBOARD];
+  }
+  return [];
+}
 
 function saludoSegunHora(): string {
   const hora = new Date().getHours();
@@ -70,7 +96,7 @@ export default function Home() {
   const [loadingEventos, setLoadingEventos] = useState(true);
 
   const cargarTareas = useCallback(async () => {
-    if (!usuario || !ROLES_CON_TAREAS.includes(usuario.rol)) return;
+    if (!usuario || !tieneAccesoTareas(usuario)) return;
     try {
       const data = await apiFetch<Nota[]>("/notas/mis-tareas");
       setTareas(data);
@@ -80,7 +106,7 @@ export default function Home() {
   }, [usuario]);
 
   const cargarEventosProximos = useCallback(async () => {
-    if (!usuario || !ROLES_CON_AGENDA.includes(usuario.rol)) {
+    if (!usuario || !tieneAccesoAgenda(usuario)) {
       setLoadingEventos(false);
       return;
     }
@@ -126,7 +152,7 @@ export default function Home() {
     year: "numeric",
   });
 
-  const accesos = ACCESOS_POR_ROL[usuario.rol] ?? [];
+  const accesos = buildAccesos(usuario);
 
   return (
     <main className="min-h-full bg-background p-4 sm:p-8">
@@ -219,7 +245,7 @@ export default function Home() {
           </div>
         )}
 
-        {ROLES_CON_AGENDA.includes(usuario.rol) && <ProximosEventos eventos={eventosProximos} loading={loadingEventos} />}
+        {tieneAccesoAgenda(usuario) && <ProximosEventos eventos={eventosProximos} loading={loadingEventos} />}
       </div>
 
       <MisTareasModal

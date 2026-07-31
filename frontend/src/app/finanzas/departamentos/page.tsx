@@ -13,7 +13,10 @@ import type { Departamento } from "@/components/finanzas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
 
-const ROLES_CON_ACCESO = ["PASTOR"];
+// Gestión de departamentos (crear/renombrar/archivar/eliminar) no es un módulo
+// delegable — exclusivo de MANAGER, igual que hoy (ver frontend/prompt.md). El
+// acceso a los movimientos del libro sí es delegable vía FINANZAS (ver /finanzas).
+const ROLES_CON_ACCESO = ["MANAGER"];
 
 export default function GestionarDepartamentosPage() {
   const { usuario, ready } = useRequireAuth();

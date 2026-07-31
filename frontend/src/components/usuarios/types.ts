@@ -1,4 +1,7 @@
-export type RolEquipo = "TESORERO" | "SECRETARIA";
+/** `POST /usuarios` ya no recibe `rol`: todo usuario creado por el MANAGER nace
+ * `USUARIO` automáticamente (ver frontend/prompt.md) — ya no hay elección de un
+ * rol "de fábrica" (Tesorero/Secretaria) al dar de alta a alguien del equipo. */
+export type RolEquipo = "USUARIO";
 
 export interface UsuarioEquipo {
   id: string;
@@ -15,14 +18,13 @@ export interface UsuarioEquipo {
 }
 
 /** Roles que pueden aparecer en el directorio de equipo (`GET /usuarios/equipo`) —
- * a diferencia de `RolEquipo`, incluye PASTOR (el directorio sí lo lista) y
+ * a diferencia de `RolEquipo`, incluye MANAGER (el directorio sí lo lista) y
  * MIEMBRO (aunque hoy no sea un caso real, el enum crudo del backend lo contempla). */
-export type RolEquipoDirectorio = "PASTOR" | "TESORERO" | "SECRETARIA" | "MIEMBRO";
+export type RolEquipoDirectorio = "MANAGER" | "USUARIO" | "MIEMBRO";
 
 export const ROL_EQUIPO_DIRECTORIO_LABEL: Record<RolEquipoDirectorio, string> = {
-  PASTOR: "Pastor",
-  TESORERO: "Tesorero",
-  SECRETARIA: "Secretaria",
+  MANAGER: "Manager",
+  USUARIO: "Usuario",
   MIEMBRO: "Miembro",
 };
 

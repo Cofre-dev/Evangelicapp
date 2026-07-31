@@ -40,7 +40,7 @@ export default function MiIglesiaPage() {
   }, []);
 
   useEffect(() => {
-    if (usuario?.rol === "PASTOR") {
+    if (usuario?.rol === "MANAGER") {
       cargarIglesia();
     }
   }, [usuario, cargarIglesia]);
@@ -49,7 +49,7 @@ export default function MiIglesiaPage() {
     return null;
   }
 
-  if (usuario.rol !== "PASTOR") {
+  if (usuario.rol !== "MANAGER") {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">No tienes permisos para ver esta página.</p>

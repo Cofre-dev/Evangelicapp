@@ -9,11 +9,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import type { SessionUser } from "@/stores/auth-store";
 import { CeremoniaFormDialog } from "./ceremonia-form-dialog";
 import { EliminarCeremoniaDialog } from "./eliminar-ceremonia-dialog";
 import { CEREMONIA_CONFIGS, nombrePrincipal, type CeremoniaTipo, type RegistroCeremonia } from "./types";
 
-const ROLES_CON_ACCESO = ["PASTOR", "SECRETARIA"];
+// Mismo criterio que ceremonias-listado.tsx: CEREMONIAS es un módulo delegable.
+function tieneAccesoCeremonias(usuario: SessionUser): boolean {
+  return usuario.rol === "MANAGER" || usuario.modulos.includes("CEREMONIAS");
+}
 
 /** Extrae el nombre de archivo de `Content-Disposition: attachment; filename="..."`, si viene. */
 function nombreArchivoDesdeHeader(res: Response, fallback: string): string {
@@ -93,7 +97,7 @@ export function CeremoniaDetalle({ tipo }: CeremoniaDetalleProps) {
     return null;
   }
 
-  if (!ROLES_CON_ACCESO.includes(usuario.rol)) {
+  if (!tieneAccesoCeremonias(usuario)) {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">No tienes permisos para ver esta página.</p>

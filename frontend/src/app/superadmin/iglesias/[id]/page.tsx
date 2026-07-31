@@ -17,7 +17,7 @@ interface MiembroEquipo {
   email: string;
   nombre: string;
   apellido: string;
-  rol: "TESORERO" | "SECRETARIA";
+  rol: "USUARIO";
   activo: boolean;
   createdAt: string;
 }
@@ -32,13 +32,19 @@ interface IglesiaDetalle {
   estado: "ACTIVA" | "SUSPENDIDA" | "INACTIVA";
   visitantesPromedio: number | null;
   createdAt: string;
-  pastor: (Omit<MiembroEquipo, "rol"> & { rol: "PASTOR" }) | null;
+  // Este endpoint (`/iglesias/:id`, exclusivo de SUPER_ADMIN) no está
+  // mencionado explícitamente en el brief de `frontend/prompt.md`. Se deja el
+  // nombre del campo (`pastor`) sin tocar por no tener confirmación de que
+  // haya cambiado, pero el valor literal de `rol` sí se actualiza a `MANAGER`
+  // porque ese es un enum global del backend y "PASTOR" ya no existe en él —
+  // dejarlo en "PASTOR" garantizaría un mismatch de tipos contra la respuesta
+  // real. Señalado para confirmar con backend en vez de asumido en silencio.
+  pastor: (Omit<MiembroEquipo, "rol"> & { rol: "MANAGER" }) | null;
   equipo: MiembroEquipo[];
 }
 
 const ROL_LABEL: Record<MiembroEquipo["rol"], string> = {
-  TESORERO: "Tesorero",
-  SECRETARIA: "Secretaria",
+  USUARIO: "Usuario",
 };
 
 const ESTADO_LABEL: Record<IglesiaDetalle["estado"], string> = {

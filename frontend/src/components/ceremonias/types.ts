@@ -11,10 +11,10 @@ export interface CampoCeremonia {
   placeholder?: string;
   /**
    * Prellenar (editable) con el nombre del pastor de la sesión. Solo tiene efecto si
-   * quien está creando el registro está logueado como PASTOR — si es SECRETARIA no hay
-   * forma de saber, del lado del cliente, quién es el pastor de la iglesia (la sesión no
-   * trae esa info y no hay endpoint expuesto a SECRETARIA para consultarlo), así que se
-   * deja en blanco en ese caso.
+   * quien está creando el registro está logueado como MANAGER (el dueño de cuenta,
+   * antes PASTOR) — si es un USUARIO no hay forma de saber, del lado del cliente,
+   * quién es el pastor de la iglesia (la sesión no trae esa info y no hay endpoint
+   * expuesto a USUARIO para consultarlo), así que se deja en blanco en ese caso.
    */
   prellenarPastor?: boolean;
 }

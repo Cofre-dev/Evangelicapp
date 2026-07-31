@@ -40,7 +40,12 @@ const MESES = [
   "Diciembre",
 ];
 
-const ROLES_CON_ACCESO = ["PASTOR", "TESORERO"];
+// FINANZAS es uno de los 4 módulos delegables (ver frontend/prompt.md): el
+// MANAGER siempre tiene acceso; un USUARIO solo si el MANAGER se lo otorgó
+// desde /accesos.
+function tieneAccesoFinanzas(usuario: { rol: string; modulos: string[] }): boolean {
+  return usuario.rol === "MANAGER" || usuario.modulos.includes("FINANZAS");
+}
 
 function StatTile({ label, value, tone }: { label: string; value: number; tone?: "positivo" | "negativo" }) {
   return (
@@ -233,7 +238,7 @@ function FinanzasContent() {
     return null;
   }
 
-  if (!ROLES_CON_ACCESO.includes(usuario.rol)) {
+  if (!tieneAccesoFinanzas(usuario)) {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">No tienes permisos para ver esta página.</p>
@@ -264,7 +269,7 @@ function FinanzasContent() {
           <DepartamentoSelector
             departamentosActivos={departamentosActivos}
             contexto={contexto}
-            esPastor={usuario.rol === "PASTOR"}
+            esManager={usuario.rol === "MANAGER"}
           />
         </div>
 

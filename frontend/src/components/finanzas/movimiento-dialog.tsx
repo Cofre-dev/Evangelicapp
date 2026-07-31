@@ -116,7 +116,7 @@ export function MovimientoDialog({
     setPendingValues(null);
     setPasswordEliminar("");
     // Un movimiento existente siempre se abre primero en modo informativo:
-    // el pastor/tesorero debe ver quién y cuándo lo registró antes de poder editarlo.
+    // quien lo abre debe ver quién y cuándo lo registró antes de poder editarlo.
     setModo(movimiento ? "ver" : "editar");
 
     if (movimiento) {

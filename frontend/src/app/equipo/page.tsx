@@ -17,23 +17,27 @@ import {
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 
-const ROLES_CON_ACCESO = ["PASTOR", "TESORERO", "SECRETARIA"];
+// Mismo criterio de acceso que tenía el directorio antes del rename de roles
+// (PASTOR/TESORERO/SECRETARIA podían verlo, MIEMBRO no) — ahora consolidado en
+// MANAGER/USUARIO. No es un módulo delegable (no depende de `modulos`, ver
+// frontend/prompt.md): cualquier USUARIO ve el directorio, la gestión
+// (alta/activar/desactivar) sigue siendo exclusiva de MANAGER vía `esManager`.
+const ROLES_CON_ACCESO = ["MANAGER", "USUARIO"];
 
 /** Mismo orden que UsuariosService#findDirectorio en el backend. */
 const ORDEN_ROL: Record<RolEquipoDirectorio, number> = {
-  PASTOR: 0,
-  TESORERO: 1,
-  SECRETARIA: 2,
-  MIEMBRO: 3,
+  MANAGER: 0,
+  USUARIO: 1,
+  MIEMBRO: 2,
 };
 
 export default function EquipoPage() {
   const { usuario, ready } = useRequireAuth();
-  const esPastor = usuario?.rol === "PASTOR";
+  const esManager = usuario?.rol === "MANAGER";
 
   const [equipo, setEquipo] = useState<UsuarioEquipoDirectorio[]>([]);
-  // Solo se carga para el pastor: trae `activo` y habilita activar/desactivar
-  // (GET /usuarios es exclusivo de PASTOR en el backend).
+  // Solo se carga para el manager: trae `activo` y habilita activar/desactivar
+  // (GET /usuarios es exclusivo de MANAGER en el backend).
   const [gestion, setGestion] = useState<Map<string, UsuarioEquipo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +51,7 @@ export default function EquipoPage() {
     try {
       const [directorio, gestionable] = await Promise.all([
         apiFetch<UsuarioEquipoDirectorio[]>("/usuarios/equipo"),
-        usuario.rol === "PASTOR" ? apiFetch<UsuarioEquipo[]>("/usuarios") : Promise.resolve([]),
+        usuario.rol === "MANAGER" ? apiFetch<UsuarioEquipo[]>("/usuarios") : Promise.resolve([]),
       ]);
       setEquipo(directorio);
       setGestion(new Map(gestionable.map((miembro) => [miembro.id, miembro])));
@@ -94,13 +98,13 @@ export default function EquipoPage() {
   }
 
   // El directorio (`/usuarios/equipo`) solo trae usuarios activos — para cualquier
-  // rol menos el pastor esa es la tarjeta que corresponde mostrar. El pastor necesita
+  // rol menos el manager esa es la tarjeta que corresponde mostrar. El manager necesita
   // ver también a los desactivados (si no, no hay forma de reactivarlos desde acá):
   // su propia tarjeta sale del directorio (no aparece en `/usuarios`, que lo excluye
   // a propósito) y el resto del equipo sale completo de `gestion`, activos e inactivos.
-  const tarjetas: UsuarioEquipoDirectorio[] = esPastor
+  const tarjetas: UsuarioEquipoDirectorio[] = esManager
     ? [
-        ...equipo.filter((miembro) => miembro.rol === "PASTOR"),
+        ...equipo.filter((miembro) => miembro.rol === "MANAGER"),
         ...Array.from(gestion.values())
           .map((miembro) => ({
             id: miembro.id,
@@ -121,7 +125,7 @@ export default function EquipoPage() {
             <h1 className="text-xl font-semibold text-foreground">Equipo</h1>
             <p className="mt-1 text-sm text-muted-foreground">Quiénes forman parte del equipo de tu iglesia.</p>
           </div>
-          {esPastor && <CreateUsuarioDialog onCreated={() => loadEquipo()} />}
+          {esManager && <CreateUsuarioDialog onCreated={() => loadEquipo()} />}
         </div>
 
         {error && (
@@ -140,8 +144,8 @@ export default function EquipoPage() {
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {tarjetas.map((miembro) => {
-              // Solo existe para el pastor (ver loadEquipo) y solo para el resto del
-              // equipo, no para el pastor mismo (GET /usuarios lo excluye a propósito).
+              // Solo existe para el manager (ver loadEquipo) y solo para el resto del
+              // equipo, no para el manager mismo (GET /usuarios lo excluye a propósito).
               const gestionable = gestion.get(miembro.id);
 
               return (
@@ -173,7 +177,7 @@ export default function EquipoPage() {
                     </span>
                   </div>
 
-                  {esPastor && gestionable && (
+                  {esManager && gestionable && (
                     <div className="mt-1 flex flex-col items-center gap-2">
                       <span
                         className={

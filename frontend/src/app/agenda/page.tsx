@@ -11,6 +11,7 @@ import { MonthCalendar } from "@/components/agenda/month-calendar";
 import type { Evento } from "@/components/agenda/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
+import type { SessionUser } from "@/stores/auth-store";
 
 const MESES = [
   "Enero",
@@ -27,7 +28,12 @@ const MESES = [
   "Diciembre",
 ];
 
-const ROLES_CON_ACCESO = ["PASTOR", "TESORERO", "SECRETARIA"];
+// AGENDA es uno de los 4 módulos delegables (ver frontend/prompt.md): el
+// MANAGER siempre tiene acceso; un USUARIO solo si el MANAGER se lo otorgó
+// desde /accesos.
+function tieneAccesoAgenda(usuario: SessionUser): boolean {
+  return usuario.rol === "MANAGER" || usuario.modulos.includes("AGENDA");
+}
 
 export default function AgendaPage() {
   const { usuario, ready } = useRequireAuth();
@@ -79,7 +85,7 @@ export default function AgendaPage() {
     return null;
   }
 
-  if (!ROLES_CON_ACCESO.includes(usuario.rol)) {
+  if (!tieneAccesoAgenda(usuario)) {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">No tienes permisos para ver esta página.</p>

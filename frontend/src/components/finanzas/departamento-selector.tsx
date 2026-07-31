@@ -15,10 +15,10 @@ interface DepartamentoSelectorProps {
    * accesibles solo si se llega directo por URL con su departamentoId). */
   departamentosActivos: Departamento[];
   contexto: ContextoFinanzas;
-  esPastor: boolean;
+  esManager: boolean;
 }
 
-export function DepartamentoSelector({ departamentosActivos, contexto, esPastor }: DepartamentoSelectorProps) {
+export function DepartamentoSelector({ departamentosActivos, contexto, esManager }: DepartamentoSelectorProps) {
   const router = useRouter();
 
   const value = contexto.tipo === "general" ? VALOR_GENERAL : contexto.id;
@@ -47,7 +47,7 @@ export function DepartamentoSelector({ departamentosActivos, contexto, esPastor 
         </SelectContent>
       </Select>
 
-      {esPastor && (
+      {esManager && (
         <Button variant="outline" size="icon" aria-label="Gestionar departamentos" asChild>
           <Link href="/finanzas/departamentos">
             <Settings className="h-4 w-4" />

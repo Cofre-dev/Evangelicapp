@@ -19,13 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import type { UsuarioEquipo } from "./types";
 
 const USERNAME_REGEX = /^[a-z][a-z0-9._]{3,19}$/;
 
+// `POST /usuarios` ya no recibe `rol`: todo usuario creado por el MANAGER nace
+// USUARIO automáticamente (ver frontend/prompt.md) — ya no hay selector de rol
+// (Tesorero/Secretaria) en este formulario.
 const createUsuarioSchema = z.object({
   username: z
     .string()
@@ -35,7 +37,6 @@ const createUsuarioSchema = z.object({
   nombre: z.string().min(1, "Ingresa el nombre"),
   apellido: z.string().min(1, "Ingresa el apellido"),
   telefono: z.string().optional(),
-  rol: z.enum(["TESORERO", "SECRETARIA"], { errorMap: () => ({ message: "Selecciona un rol" }) }),
 });
 
 type CreateUsuarioValues = z.infer<typeof createUsuarioSchema>;
@@ -81,7 +82,6 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
           nombre: values.nombre,
           apellido: values.apellido,
           telefono: values.telefono || undefined,
-          rol: values.rol,
         }),
       });
 
@@ -174,7 +174,7 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
                     <FormItem>
                       <FormLabel>Correo electrónico</FormLabel>
                       <FormControl>
-                        <Input type="email" autoComplete="email" placeholder="tesorero@iglesia.cl" {...field} />
+                        <Input type="email" autoComplete="email" placeholder="usuario@iglesia.cl" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -220,28 +220,6 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
                       <FormControl>
                         <Input type="tel" autoComplete="tel" placeholder="+56 9 1234 5678" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="rol"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rol</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un rol" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="TESORERO">Tesorero</SelectItem>
-                          <SelectItem value="SECRETARIA">Secretaria</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

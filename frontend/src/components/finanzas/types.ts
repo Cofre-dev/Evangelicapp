@@ -19,7 +19,7 @@ export interface Categoria {
   tipo: TipoMovimiento;
 }
 
-/** Sub-libro opcional de finanzas (ej. Música, Diaconía). Solo el PASTOR lo administra. */
+/** Sub-libro opcional de finanzas (ej. Música, Diaconía). Solo el MANAGER lo administra. */
 export interface Departamento {
   id: string;
   nombre: string;
