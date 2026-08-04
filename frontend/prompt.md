@@ -1,114 +1,321 @@
-# Brief para frontend — Rename PASTOR→MANAGER, eliminación de TESORERO/SECRETARIA, nuevo módulo de Accesos
+# Brief para Frontend — Planes comerciales (Básico/Medio/Pro) + Facturación
 
-## Qué cambió en el backend (ya implementado y desplegado a la BD de dev)
+El backend ya implementa planes comerciales, fecha de facturación y el bloqueo de
+acceso por mora. Este documento es la especificación completa para construir la
+parte de frontend (repo separado). Está escrito para poder implementarse sin tener
+que leer el código del backend, pero si algo no calza, la fuente de verdad son los
+archivos citados entre paréntesis.
 
-1. **Rol `PASTOR` renombrado a `MANAGER`.** Es el mismo dueño de cuenta de siempre (gestiona su
-   equipo, agenda, finanzas, notas, mi iglesia) — solo cambia el string.
-2. **`TESORERO` y `SECRETARIA` desaparecen.** Se reemplazan por un único rol genérico
-   **`USUARIO`**. Ya no existe un rol "de fábrica" con permisos fijos para el equipo — el acceso
-   de cada `USUARIO` a cada módulo del sistema lo otorga el `MANAGER` de forma individual, desde
-   una pantalla nueva (checkbox por módulo, ver más abajo).
-3. `MIEMBRO` y `SUPER_ADMIN` no cambian.
-4. El enum de rol en la API queda: `SUPER_ADMIN | MANAGER | USUARIO | MIEMBRO`.
+## Resumen de negocio (contexto)
 
-## Nuevo concepto: módulos delegables
+3 planes, estrategia tipo "bencina 93/95/97" — siempre empujar al más caro:
 
-Existen 4 módulos que el `MANAGER` puede otorgar a un `USUARIO`, uno a la vez:
-`AGENDA`, `FINANZAS`, `CEREMONIAS`, `INTEGRANTES`. Esta lista puede crecer a futuro sin que
-cambie el contrato de la API (ver `GET /accesos/catalogo` abajo) — el frontend **no debe
-hardcodear** esta lista, debe leerla del backend.
+| Plan | Máx. usuarios (incl. manager) | Subdepartamentos de finanzas |
+|---|---|---|
+| Básico | 3 | Sin acceso |
+| Medio | 8 | Sin acceso |
+| Pro | 15 | Hasta 10 |
 
-**Notas/Tareas, Mi Iglesia y Usuarios (gestión de equipo) NO son delegables** — siguen siendo
-exclusivos del `MANAGER`, igual que hoy. La única excepción: cualquier `USUARIO` (sin permiso de
-módulo) sigue pudiendo ver y marcar como hechas **sus propias** tareas asignadas — eso no
-cambia, no requiere ningún checkbox.
+Toda iglesia nueva **debe** tener un plan y una fecha de facturación asignados por
+el SuperAdmin al crearse — no hay un plan por defecto. Cambiar de plan después
+nunca borra ni desactiva datos existentes, solo cambia los topes hacia delante.
 
-## Endpoints nuevos/cambiados
+No hay pasarela de pago todavía: los pagos se confirman **manualmente** por el
+SuperAdmin. El módulo de facturación del lado de la iglesia es solo informativo.
 
-Todos requieren sesión (cookie httpOnly de siempre). Los 3 primeros son **solo `MANAGER`**
-(403 para cualquier otro rol):
+## 1. Tipos nuevos
 
-- `GET /accesos/catalogo` → `[{ id: "AGENDA", label: "Agenda" }, { id: "FINANZAS", label: "Finanzas" }, ...]`
-  Úsalo para generar dinámicamente las columnas de la pantalla de Accesos.
-- `GET /accesos/usuarios` → lista de usuarios con rol `USUARIO` de la iglesia, cada uno con sus
-  módulos actuales: `[{ id, nombre, apellido, username, fotoUrl, activo, modulos: ["FINANZAS"] }, ...]`
-- `PUT /accesos/usuarios/:usuarioId` con body `{ "modulos": ["AGENDA", "FINANZAS"] }` → reemplaza
-  por completo el set de módulos de ese usuario (marcar/desmarcar un checkbox y guardar debe
-  mandar el array completo resultante, no un diff).
-- `GET /auth/me` (el endpoint que ya usan hoy para cargar el usuario logueado) ahora incluye un
-  campo nuevo **`modulos: string[]`** con los módulos que el usuario actual tiene otorgados
-  (siempre `[]` para `MANAGER`/`SUPER_ADMIN`/`MIEMBRO`, porque su acceso no depende de esta
-  lista). **Usa este campo para decidir qué mostrar en el menú.**
-- `POST /usuarios` (alta de equipo) **ya no recibe `rol` en el body** — todo usuario creado por
-  el `MANAGER` nace con rol `USUARIO` automáticamente. El formulario de alta de usuario debe
-  **quitar el selector de rol** (Tesorero/Secretaria) que tiene hoy.
+```ts
+type PlanIglesia = "BASICO" | "MEDIO" | "PRO";
 
-## Pantalla nueva: "Accesos" (solo visible para MANAGER)
+// EstadoIglesia ya existía (ver stores/auth-store.ts y las páginas de superadmin);
+// SUSPENDIDA ahora tiene un significado operativo concreto: iglesia oculta por mora.
+type EstadoIglesia = "ACTIVA" | "SUSPENDIDA" | "INACTIVA";
 
-Una tabla: una fila por usuario (de `GET /accesos/usuarios`), una columna por módulo (de
-`GET /accesos/catalogo`), un checkbox por celda. Al tildar/destildar y guardar, se llama
-`PUT /accesos/usuarios/:usuarioId` con el array completo de módulos marcados para esa fila.
-Como las columnas salen de `/accesos/catalogo`, si el backend agrega un módulo nuevo en el
-futuro, esta pantalla debe mostrar la columna nueva automáticamente, sin cambios de código.
+interface EstadoFacturacion {
+  proximaFacturacion: string; // ISO date
+  diasParaFacturacion: number; // negativo si ya venció
+  color: "VERDE" | "AMARILLO" | "ROJO";
+  enMora: boolean;
+  diasEnMora: number; // 0 si no está en mora
+  puedeOcultar: boolean; // true con 3+ días de mora — habilita el botón "ocultar iglesia"
+}
+```
 
-Agregar esta pantalla al menú/sidebar solo para `rol === "MANAGER"`.
+**Semáforo** (`backend/src/common/utils/calcular-facturacion.ts`): verde es todo lo
+que no es amarillo ni rojo (>7 días para la fecha de pago), amarillo arranca a los
+7 días, rojo arranca a los 2 días y se mantiene rojo mientras esté vencida (sumando
+`enMora`/`diasEnMora`). No recalcules esto en el frontend — el backend siempre
+manda `facturacion` ya calculado; solo hay que pintarlo.
 
-## Impacto en el código actual del frontend (ya revisado)
+Colores sugeridos (Tailwind, ajustar a la paleta real del design system):
+- `VERDE` → verde éxito (ej. `bg-emerald-100 text-emerald-700`)
+- `AMARILLO` → amarillo advertencia (ej. `bg-amber-100 text-amber-700`)
+- `ROJO` → rojo destructivo (ej. `bg-destructive/10 text-destructive`, ya usado en `Alert variant="destructive"`)
 
-Encontramos estos puntos concretos que hoy dependen de roles fijos y van a necesitar volverse
-dinámicos (basados en `modulos`, no en un `switch`/mapa por rol):
+## 2. Alta de iglesia (SuperAdmin) — `CreateIglesiaDialog`
 
-- **`src/stores/auth-store.ts`**: el tipo `Rol = "SUPER_ADMIN" | "PASTOR" | "TESORERO" | "SECRETARIA" | "MIEMBRO"`
-  pasa a `"SUPER_ADMIN" | "MANAGER" | "USUARIO" | "MIEMBRO"`. El objeto de usuario persistido
-  debe guardar también el nuevo campo `modulos: string[]` que devuelve `/auth/me`.
-- **`src/components/layout/navbar.tsx`**: el mapa estático `NAV_LINKS: Record<Rol, NavItem[]>`
-  ya no alcanza (antes cada rol tenía su lista fija de links). Reemplazarlo por: los links
-  exclusivos de `MANAGER` se muestran si `rol === "MANAGER"`; los links de Agenda/Finanzas/
-  Ceremonias/Integrantes se muestran si `modulos.includes("AGENDA")` (etc.) **o** si
-  `rol === "MANAGER"` (el manager ve todo, siempre).
-- **`src/app/page.tsx`**: mismo problema en `ACCESOS_POR_ROL`, `ROLES_CON_TAREAS`,
-  `ROLES_CON_AGENDA` — misma solución (data-driven por `modulos` + chequeo de `MANAGER`).
-- **`src/components/usuarios/types.ts`**: `RolEquipo = "TESORERO" | "SECRETARIA"` y su label en
-  español (`ROL_EQUIPO_DIRECTORIO_LABEL`) se eliminan — ya no hay elección de rol al crear un
-  usuario de equipo, solo existe `USUARIO`. El directorio (`/usuarios/equipo`, endpoint que no
-  cambió) ahora solo necesita mostrar "Manager" o "Usuario" según corresponda, sin las etiquetas
-  viejas.
-- No hay `middleware.ts` de rutas — la protección se hace por página/componente leyendo
-  `usuario.rol` desde el store. Los mismos componentes que hoy chequean `rol === "PASTOR"` etc.
-  para ocultar/mostrar secciones deben chequear `modulos` en vez de rol para lo que antes era
-  Tesorero/Secretaria.
+Archivo: `src/components/iglesias/create-iglesia-dialog.tsx`.
 
-## Detalle importante de timing (no es un bug, es a propósito)
+Agregar al `createIglesiaSchema` (línea 30) y a los `defaultValues` (línea 83):
 
-El backend calcula los `modulos` del usuario **al emitir el access token** (login o refresh),
-no en cada request — el mismo comportamiento que ya existe hoy para `rol` (un cambio de rol
-tampoco se revalida en cada request). Esto significa: si el manager le otorga un módulo nuevo a
-alguien que ya tiene sesión iniciada, el menú puede tardar hasta ~15 min (vida del access token)
-en poder **usar** ese módulo en la API, aunque `GET /auth/me` (que sí es fresco) ya lo muestre
-antes en el menú. Es el mismo trade-off que ya existe hoy para cambios de rol, no es nuevo.
-Si esto genera una mala experiencia (usuario ve el link en el menú pero la API le da 403), avisen
-y evaluamos forzar un refresh de token al guardar accesos — no se implementó porque no fue
-pedido explícitamente y agregaría complejidad no solicitada.
+```ts
+plan: z.enum(["BASICO", "MEDIO", "PRO"], { required_error: "Selecciona un plan" }),
+proximaFacturacion: z.string().min(1, "Selecciona la fecha de facturación"),
+```
 
-## ⚠️ Pendiente de confirmar con backend (encontrado durante la implementación)
+En el paso 1 del formulario (junto a región/comuna, antes del botón "Siguiente" en
+la línea ~327), agregar:
+- Un `Select` de plan con las 3 opciones (Básico / Medio / Pro). Considera mostrar
+  los topes de cada uno en el mismo selector (ej. "Pro — hasta 15 usuarios, 10
+  subdepartamentos") para que el SuperAdmin no tenga que adivinar.
+- Un date picker para `proximaFacturacion` (primera fecha de cobro acordada).
 
-Al probar el flujo real de "crear usuario → iniciar sesión con ese usuario", `POST /auth/login`
-devolvió un `usuario` **sin el campo `modulos`** (`undefined`, no `[]`). El brief solo menciona
-explícitamente que `GET /auth/me` incluye `modulos` — la respuesta de `POST /auth/login` no está
-mencionada, pero el frontend usa el `usuario` de login directamente (vía `setSession`) para
-decidir qué mostrar en el navbar/home antes de que se dispare ningún `/auth/me`, así que también
-necesita `modulos` ahí. Se agregó una normalización defensiva en el frontend (`setSession` en
-`auth-store.ts` cae a `[]` si `modulos` no viene), así que esto no bloquea, pero **`POST /auth/login`
-debería devolver `modulos: string[]` en `usuario` igual que `/auth/me`** para que un `USUARIO`
-recién logueado vea sus módulos reales desde el primer render, no una lista vacía hasta el
-próximo `/auth/me` (o hasta el próximo refresh de token, ~15 min después).
+En `onSubmit` (línea 137), agregar al `FormData`:
+```ts
+formData.append("plan", values.plan);
+formData.append("proximaFacturacion", values.proximaFacturacion); // "YYYY-MM-DD"
+```
 
-## Checklist para el equipo de frontend
+El resto del flujo (multipart, `POST /iglesias`) no cambia.
 
-- [x] Actualizar el tipo `Rol` (quitar PASTOR/TESORERO/SECRETARIA, agregar MANAGER/USUARIO).
-- [x] Guardar `modulos: string[]` en el store de auth, tomado de `/auth/me` y del login.
-- [x] Nueva pantalla de Accesos (solo MANAGER) consumiendo `/accesos/catalogo`, `/accesos/usuarios`, `PUT /accesos/usuarios/:id`.
-- [x] Sidebar/menú y home (`page.tsx`) data-driven por `modulos` en vez de mapas fijos por rol.
-- [x] Formulario de alta de usuario: quitar selector de rol.
-- [x] Quitar `RolEquipo`/labels de Tesorero-Secretaria del directorio de equipo.
-- [x] Revisar cualquier otro `if (rol === "TESORERO" ...)` o `"SECRETARIA"` suelto en el código (búsqueda de texto) que no hayamos listado acá.
+## 3. Detalle de iglesia (SuperAdmin) — `/superadmin/iglesias/[id]`
+
+Archivo: `src/app/superadmin/iglesias/[id]/page.tsx`. El endpoint `GET /iglesias/:id`
+ahora devuelve, además de lo que ya se consume (`pastor`, `equipo`, `estado`, etc.):
+
+```json
+{
+  "id": "...",
+  "nombre": "...",
+  "estado": "ACTIVA",
+  "ultimoPagoAt": "2026-07-05T00:00:00.000Z",
+  "plan": "PRO",
+  "pastor": { "...": "..." },
+  "equipo": ["..."],
+  "facturacion": {
+    "proximaFacturacion": "2026-08-20T00:00:00.000Z",
+    "diasParaFacturacion": 17,
+    "color": "VERDE",
+    "enMora": false,
+    "diasEnMora": 0,
+    "puedeOcultar": false
+  },
+  "limites": {
+    "usuarios": { "actuales": 4, "maximo": 15 },
+    "departamentosFinancieros": { "actuales": 2, "maximo": 10 }
+  }
+}
+```
+
+Nota: **no** hay un `proximaFacturacion` a nivel raíz — vive dentro de `facturacion`.
+`ultimoPagoAt` puede ser `null` (nunca se ha marcado un pago).
+
+Agregar a esta pantalla:
+
+1. **Badge de plan** junto al badge de estado que ya existe (línea ~144-153).
+2. **Tarjeta de facturación**: fecha de próxima facturación con el badge de color
+   (`facturacion.color`), y si `enMora` es `true`, un texto tipo "Vencida hace {N}
+   días". Si `diasParaFacturacion >= 0`, mostrar "Faltan {N} días".
+3. **Acciones de SuperAdmin** (todas mutan y deberían refrescar la página con la
+   respuesta del propio endpoint, que ya viene con el shape completo de arriba):
+   - **Cambiar plan**: `PATCH /iglesias/:id/plan` con body `{ "plan": "MEDIO" }`.
+   - **Editar fecha de facturación** (corrección manual, ej. error de tipeo):
+     `PATCH /iglesias/:id/facturacion` con body `{ "proximaFacturacion": "2026-09-05" }`.
+   - **Marcar como pagada**: `POST /iglesias/:id/marcar-pagada` (sin body). Avanza
+     la fecha un mes y reactiva la iglesia si estaba oculta. Usar como el botón
+     principal de "confirmar pago" — es el único mecanismo de pago que existe hoy.
+   - **Ocultar iglesia**: `PATCH /iglesias/:id/ocultar` (sin body). Es el checkbox/
+     botón que pediste que solo esté disponible cuando `facturacion.puedeOcultar
+     === true` (3+ días de mora) — deshabilítalo si es `false`, con un tooltip tipo
+     "Disponible cuando la mora supere los 3 días". El backend también lo valida
+     server-side, así que un intento fuera de esa ventana responde 403 igual.
+   - **Mostrar iglesia**: `PATCH /iglesias/:id/mostrar` (sin body). Siempre
+     disponible — para deshacer un "ocultar" hecho por error, sin tener que pasar
+     por "marcar pagada".
+   - Uso actual vs. plan (`limites`): una barra o texto simple tipo "4 / 15 usuarios",
+     "2 / 10 subdepartamentos" — útil para que el SuperAdmin sepa si vale la pena
+     ofrecerle un upgrade a esa iglesia.
+
+## 4. Dashboard SuperAdmin — columna de plan
+
+Archivo: `src/app/superadmin/page.tsx`. `GET /superadmin/dashboard` ahora incluye
+`plan` en cada fila de `iglesias` (mismo nivel que `estado`). Agregar una columna
+"Plan" a la tabla (línea ~183), con el mismo tipo de badge que el de `estado`.
+
+## 5. Sesión y plan visible en toda la app
+
+Archivo: `src/stores/auth-store.ts`. El campo `iglesia` dentro de `SessionUser`
+(línea 16) ahora trae `plan` también:
+
+```ts
+iglesia: { nombre: string; logoUrl: string | null; plan: "BASICO" | "MEDIO" | "PRO" } | null;
+```
+
+Esto viene poblado en **toda** sesión (`/auth/login` y `/auth/me`), para cualquier
+rol de la iglesia (MANAGER y USUARIO), no solo el manager. Úsalo para mostrar un
+badge de plan visible en el shell de la app (navbar/sidebar) — es el pedido de
+"que se vea reflejado qué plan tienen". `SUPER_ADMIN` no tiene `iglesia` (sigue
+siendo `null`, sin cambios).
+
+## 6. Bloqueo de acceso por mora (lado iglesia)
+
+Cuando una iglesia queda oculta (`estado = SUSPENDIDA`, ver sección SuperAdmin),
+**ningún** usuario de esa iglesia puede loguearse ni mantener una sesión activa —
+esto se revalida en cada request, igual que ya se hace con `usuario.activo`.
+
+Ambos casos (login bloqueado y sesión cortada a mitad de camino) usan la **misma
+forma de error**, un 403 con este body:
+
+```json
+{
+  "statusCode": 403,
+  "code": "IGLESIA_SUSPENDIDA",
+  "message": "La iglesia tiene la mensualidad pendiente de pago.",
+  "diasEnMora": 5
+}
+```
+
+Cambios necesarios en `src/lib/api.ts`:
+
+1. En `POST /auth/login` (`src/app/login/page.tsx`, función `onSubmit`, línea 60):
+   si el catch recibe un `ApiError` con `error.body?.code === "IGLESIA_SUSPENDIDA"`,
+   en vez de mostrar `serverError` normal, redirigir a una página nueva
+   `/cuenta-suspendida?dias=<diasEnMora>` (ver punto 3 abajo) en lugar de quedarse
+   en el login.
+2. En `apiFetch` (`src/lib/api.ts`, alrededor de la línea 127, donde ya se maneja
+   `res.status === 401`): agregar el mismo tratamiento para `res.status === 403`
+   **cuando** `body?.code === "IGLESIA_SUSPENDIDA"` — limpiar la sesión
+   (`clearSession()`) y redirigir a `/cuenta-suspendida?dias=<diasEnMora>`. Esto
+   cubre el caso de una sesión que ya estaba abierta cuando el SuperAdmin oculta la
+   iglesia: la próxima llamada a la API (cualquiera) la corta.
+3. **Página `/cuenta-suspendida`** (nueva, pública, sin `useRequireAuth`): el texto
+   pedido es algo como "No han pagado la mensualidad, pónganse al día" + un
+   contador de días en mora usando el query param `dias`. Sugerido: "Llevan {dias}
+   días de atraso en el pago de tu mensualidad." + un `mailto:contacto@evangelic.app`
+   como salida. No necesita datos de la iglesia (el mensaje es genérico), así que no
+   hace falta ninguna llamada a la API en esta pantalla.
+
+## 7. Módulo de Facturación (lado iglesia) — nueva página `/facturacion`
+
+Solo MANAGER (mismo alcance que `/mi-iglesia`, ver `mi-iglesia.controller.ts`).
+Nuevo endpoint: `GET /mi-iglesia/facturacion`:
+
+```json
+{
+  "id": "...",
+  "nombre": "...",
+  "estado": "ACTIVA",
+  "plan": "MEDIO",
+  "facturacion": {
+    "proximaFacturacion": "2026-08-10T00:00:00.000Z",
+    "diasParaFacturacion": 7,
+    "color": "AMARILLO",
+    "enMora": false,
+    "diasEnMora": 0,
+    "puedeOcultar": false
+  },
+  "limites": {
+    "usuarios": { "actuales": 5, "maximo": 8 },
+    "departamentosFinancieros": { "actuales": 0, "maximo": 0 }
+  }
+}
+```
+
+Contenido de la página (todo informativo, sin acciones — no hay pasarela de pago):
+
+- Plan actual, con los topes (usuarios y subdepartamentos) y el uso actual
+  (`limites`).
+- Fecha de próxima facturación con el badge de color de `facturacion.color`.
+- Texto fijo: *"Si ya pagaste tu mensualidad, pero te aparece que no, manda un
+  correo a contacto@evangelic.app con el asunto 'Confirmación de pago —
+  {nombre de la iglesia}'."*
+- Texto fijo: *"Si quieres subir de plan, manda un correo a contacto@evangelic.app
+  con el asunto 'Solicitud de upgrade de plan — {nombre de la iglesia}'."*
+  (Los asuntos entre comillas son una propuesta mía — confírmalos con el fundador
+  antes de darlos por definitivos, el pedido original los dejó sin especificar.)
+
+**Aviso en el dashboard principal**: cuando `facturacion.color` sea `AMARILLO` **o**
+`ROJO` (rojo es más urgente que amarillo, así que debería incluirse también aunque
+el pedido original solo mencionó amarillo), mostrar un banner/alert en el dashboard
+de inicio de la iglesia (MANAGER y USUARIO) del tipo "Tu próxima facturación es en
+{N} días — revisa el módulo de Facturación", con link a `/facturacion`. Esto implica
+llamar `GET /mi-iglesia/facturacion` desde el dashboard, o exponer ese dato en un
+layout compartido si ya existe uno para el shell de la app.
+
+## 8. Límite de usuarios por plan
+
+Al crear un usuario (`POST /usuarios`, formulario en `src/app/equipo/` o donde
+viva hoy la gestión de equipo), si el plan ya está al tope, el backend responde
+403:
+
+```json
+{
+  "statusCode": 403,
+  "code": "PLAN_LIMITE_USUARIOS",
+  "message": "Tu plan Básico solo permite 3 usuarios (incluyendo al manager). Habla con contacto@evangelic.app para subir de plan.",
+  "plan": "BASICO",
+  "maximo": 3
+}
+```
+
+Cuando el catch del formulario de creación reciba `error.body?.code ===
+"PLAN_LIMITE_USUARIOS"`, mostrar un modal (no solo el error inline de siempre) con
+el `message` tal cual viene del backend (ya incluye el contacto y el número
+correcto para el plan que sea). Después de mostrarlo, deshabilitar el botón de
+"crear usuario" en esa sesión de la página — no hace falta que sea permanente ni
+reactivo a otros cambios, con que no deje seguir insistiendo en la misma pantalla
+basta. La forma más simple: guardar un estado `limiteAlcanzado` en el componente y
+condicionar el `disabled` del botón a eso.
+
+Opcionalmente (no bloqueante): usar `limites.usuarios` de `GET /mi-iglesia` (si esa
+pantalla ya lo consume) para deshabilitar el botón *antes* de intentarlo, evitando
+el viaje redondo al backend.
+
+## 9. Subdepartamentos de finanzas por plan
+
+Al crear un departamento (`POST /finanzas/departamentos`, en `src/app/finanzas/departamentos/`):
+
+- Planes **Básico/Medio**: el backend responde 403 con
+  `code: "PLAN_SIN_SUBDEPARTAMENTOS"`. Como el pedido original es "sin acceso" (no
+  solo un límite), la recomendación es **ocultar directamente** la entrada de menú
+  o el botón "Crear departamento" para estos dos planes (usar
+  `usuario.iglesia.plan` de la sesión, ver sección 5) en vez de dejar que el
+  usuario llegue al 403. Si de todos modos llega (ej. otra pestaña con un plan
+  viejo cacheado), mostrar `error.body.message` en un alert simple — no hace falta
+  modal, a diferencia del caso de usuarios.
+- Plan **Pro** al tope de 10: `code: "PLAN_LIMITE_DEPARTAMENTOS"`, mismo
+  tratamito de alert simple con `error.body.message`.
+
+## 10. Resumen de endpoints nuevos/modificados
+
+| Método | Ruta | Rol | Cambio |
+|---|---|---|---|
+| `POST` | `/iglesias` | SUPER_ADMIN | Body ahora exige `plan` y `proximaFacturacion` |
+| `GET` | `/iglesias/:id` | SUPER_ADMIN | Response ahora incluye `plan`, `facturacion`, `limites`, `ultimoPagoAt` |
+| `PATCH` | `/iglesias/:id/plan` | SUPER_ADMIN | Nuevo — cambia el plan |
+| `PATCH` | `/iglesias/:id/facturacion` | SUPER_ADMIN | Nuevo — corrige la fecha de facturación |
+| `POST` | `/iglesias/:id/marcar-pagada` | SUPER_ADMIN | Nuevo — confirma pago, avanza 1 mes, reactiva si estaba oculta |
+| `PATCH` | `/iglesias/:id/ocultar` | SUPER_ADMIN | Nuevo — oculta la iglesia (requiere 3+ días de mora) |
+| `PATCH` | `/iglesias/:id/mostrar` | SUPER_ADMIN | Nuevo — reactiva la iglesia |
+| `GET` | `/superadmin/dashboard` | SUPER_ADMIN | Cada iglesia de la lista ahora incluye `plan` |
+| `GET` | `/mi-iglesia/facturacion` | MANAGER | Nuevo — módulo de facturación informativo |
+| `POST` | `/auth/login` | — | Puede responder 403 `IGLESIA_SUSPENDIDA` |
+| cualquier ruta autenticada | — | — | Puede responder 403 `IGLESIA_SUSPENDIDA` si la iglesia se ocultó a mitad de sesión |
+| `POST` | `/usuarios` | MANAGER | Puede responder 403 `PLAN_LIMITE_USUARIOS` |
+| `POST` | `/finanzas/departamentos` | MANAGER | Puede responder 403 `PLAN_SIN_SUBDEPARTAMENTOS` o `PLAN_LIMITE_DEPARTAMENTOS` |
+| `GET`/`POST`/`PATCH` `/auth/*` | — | — | `SafeUsuario.iglesia` ahora incluye `plan` |
+
+## Decisiones que tomé (a confirmar si algo no calza con lo que tenías en mente)
+
+- **`EstadoIglesia.SUSPENDIDA`** (que ya existía en el schema, sin uso real hasta
+  ahora) es el mecanismo que se reutilizó para "iglesia oculta por mora" — no se
+  agregó un campo nuevo. Como efecto colateral (ya existía antes de este cambio),
+  una iglesia oculta también deja de responder en el QR público de Integrantes.
+- El semáforo usa el esquema "escalón simple" que confirmaste: verde >7 días,
+  amarillo ≤7, rojo ≤2 o vencida.
+- "Marcar como pagada" es la única forma de avance de fecha que existe (no hay
+  pasarela) y siempre suma el mes sobre la fecha vencida anterior (nunca sobre
+  "hoy"), para no correr el día de cobro acordado con la iglesia.
+- Los asuntos de correo sugeridos en la sección 7 son una propuesta mía, no un
+  requisito — confírmalos.

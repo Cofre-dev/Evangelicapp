@@ -23,15 +23,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, apiFetch } from "@/lib/api";
 import { REGIONES_CHILE } from "@/lib/chile-regiones";
+import { PLAN_LABEL, PLAN_LIMITES } from "@/components/iglesias/types";
 import { useAuthStore } from "@/stores/auth-store";
 
 const USERNAME_REGEX = /^[a-z][a-z0-9._]{3,19}$/;
+const PLANES = ["BASICO", "MEDIO", "PRO"] as const;
 
 const createIglesiaSchema = z.object({
   nombre: z.string().min(1, "Ingresa el nombre"),
   region: z.string().min(1, "Selecciona una región"),
   comuna: z.string().min(1, "Selecciona una comuna"),
   direccion: z.string().optional(),
+  plan: z.enum(PLANES, { errorMap: () => ({ message: "Selecciona un plan" }) }),
+  proximaFacturacion: z.string().min(1, "Selecciona la fecha de facturación"),
   pastorUsername: z
     .string()
     .min(1, "Ingresa un usuario")
@@ -44,7 +48,7 @@ const createIglesiaSchema = z.object({
 type CreateIglesiaValues = z.infer<typeof createIglesiaSchema>;
 
 /** Campos que se validan antes de dejar avanzar del paso 1 (iglesia) al paso 2 (pastor). */
-const CAMPOS_PASO_IGLESIA = ["nombre", "region", "comuna"] as const;
+const CAMPOS_PASO_IGLESIA = ["nombre", "region", "comuna", "plan", "proximaFacturacion"] as const;
 
 interface IglesiaCreada {
   id: string;
@@ -85,6 +89,8 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
       region: "",
       comuna: "",
       direccion: "",
+      plan: "BASICO",
+      proximaFacturacion: "",
       pastorUsername: "",
       pastorEmail: "",
       pastorNombre: "",
@@ -143,6 +149,8 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
     formData.append("region", values.region);
     formData.append("comuna", values.comuna);
     if (values.direccion) formData.append("direccion", values.direccion);
+    formData.append("plan", values.plan);
+    formData.append("proximaFacturacion", values.proximaFacturacion);
     formData.append("pastorUsername", values.pastorUsername);
     formData.append("pastorEmail", values.pastorEmail);
     formData.append("pastorNombre", values.pastorNombre);
@@ -313,6 +321,50 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
                         </FormItem>
                       )}
                     />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="plan"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Plan</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {PLANES.map((plan) => (
+                                  <SelectItem key={plan} value={plan}>
+                                    {PLAN_LABEL[plan]} — hasta {PLAN_LIMITES[plan].usuarios} usuarios
+                                    {PLAN_LIMITES[plan].departamentos > 0
+                                      ? `, ${PLAN_LIMITES[plan].departamentos} subdepartamentos`
+                                      : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="proximaFacturacion"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primera facturación</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="logo">Logo (opcional)</Label>

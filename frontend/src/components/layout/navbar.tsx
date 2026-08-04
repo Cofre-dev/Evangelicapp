@@ -8,6 +8,7 @@ import { Building2, ChevronDown, LogOut, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
 import { API_URL, apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type SessionUser } from "@/stores/auth-store";
 
@@ -30,6 +31,7 @@ const EQUIPO_LINK: NavItem = { type: "link", href: "/equipo", label: "Equipo" };
 const ACCESOS_LINK: NavItem = { type: "link", href: "/accesos", label: "Accesos" };
 const INTEGRANTES_LINK: NavItem = { type: "link", href: "/integrantes", label: "Integrantes" };
 const MI_IGLESIA_LINK: NavItem = { type: "link", href: "/mi-iglesia", label: "Mi iglesia" };
+const FACTURACION_LINK: NavItem = { type: "link", href: "/facturacion", label: "Facturación" };
 
 const CEREMONIAS_GRUPO: NavItem = {
   type: "group",
@@ -87,6 +89,7 @@ function buildLinks(usuario: SessionUser): NavItem[] {
       INTEGRANTES_LINK,
       CEREMONIAS_GRUPO,
       MI_IGLESIA_LINK,
+      FACTURACION_LINK,
       PERFIL_LINK,
     ];
   }
@@ -178,6 +181,11 @@ export function Navbar() {
                 </div>
               )}
               <span className="text-sm text-muted-foreground">{usuario.iglesia.nombre}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE_CLASSES[usuario.iglesia.plan]}`}
+              >
+                {PLAN_LABEL[usuario.iglesia.plan]}
+              </span>
             </div>
           )}
         </div>
@@ -211,7 +219,14 @@ export function Navbar() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">@{usuario.username}</p>
                   {usuario.iglesia && (
-                    <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PLAN_BADGE_CLASSES[usuario.iglesia.plan]}`}
+                      >
+                        {PLAN_LABEL[usuario.iglesia.plan]}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

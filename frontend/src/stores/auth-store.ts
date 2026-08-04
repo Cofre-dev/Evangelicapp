@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { PlanIglesia } from "@/components/iglesias/types";
 
 export type Rol = "SUPER_ADMIN" | "MANAGER" | "USUARIO" | "MIEMBRO";
 
@@ -13,7 +14,7 @@ export interface SessionUser {
   fotoUrl: string | null;
   rol: Rol;
   iglesiaId: string | null;
-  iglesia: { nombre: string; logoUrl: string | null } | null;
+  iglesia: { nombre: string; logoUrl: string | null; plan: PlanIglesia } | null;
   mustChangePassword: boolean;
   onboardingCompletado: boolean;
   /** Módulos delegables (`AGENDA`/`FINANZAS`/`CEREMONIAS`/`INTEGRANTES`, catálogo
@@ -54,14 +55,17 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "evangelicapp-auth",
-      // v1: rename PASTOR→MANAGER, TESORERO/SECRETARIA→USUARIO, agrega `modulos`
-      // (ver frontend/prompt.md). Sesiones persistidas antes de este cambio traen
-      // roles viejos y sin `modulos` — no hay forma de mapearlas al nuevo shape,
-      // así que se descartan y se fuerza un re-login en vez de crashear la UI.
-      version: 1,
+      // v2: `iglesia` gana `plan` (ver frontend/prompt.md, planes comerciales).
+      // Mismo criterio que la migración v1 (`modulos`): una sesión persistida
+      // antes de este cambio no tiene forma de conseguir su `plan` sin volver a
+      // loguearse, así que se descarta en vez de dejar `plan` undefined en runtime.
+      version: 2,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AuthState> | undefined;
         if (!state?.usuario || !Array.isArray(state.usuario.modulos)) {
+          return { ...state, usuario: null };
+        }
+        if (state.usuario.iglesia && !("plan" in state.usuario.iglesia)) {
           return { ...state, usuario: null };
         }
         return state;

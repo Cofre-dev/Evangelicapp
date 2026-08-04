@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DepartamentoDialog } from "@/components/finanzas/departamento-dialog";
 import { EliminarDepartamentoDialog } from "@/components/finanzas/eliminar-departamento-dialog";
 import type { Departamento } from "@/components/finanzas/types";
+import { planTieneSubdepartamentos } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
 
@@ -108,6 +109,10 @@ export default function GestionarDepartamentosPage() {
     );
   }
 
+  // Básico/Medio no tienen acceso a subdepartamentos (ver frontend/prompt.md,
+  // sección 9) — se oculta "Nuevo departamento" en vez de dejar llegar al 403.
+  const puedeCrear = Boolean(usuario.iglesia && planTieneSubdepartamentos(usuario.iglesia.plan));
+
   return (
     <main className="h-full bg-background p-8">
       <div className="mx-auto max-w-3xl">
@@ -123,11 +128,22 @@ export default function GestionarDepartamentosPage() {
               Sub-libros opcionales de finanzas (ej. Música, Diaconía) con sus propias categorías y movimientos.
             </p>
           </div>
-          <Button onClick={abrirCreacion}>
-            <Plus className="h-4 w-4" />
-            Nuevo departamento
-          </Button>
+          {puedeCrear && (
+            <Button onClick={abrirCreacion}>
+              <Plus className="h-4 w-4" />
+              Nuevo departamento
+            </Button>
+          )}
         </div>
+
+        {!puedeCrear && (
+          <Alert className="mt-6">
+            <AlertDescription>
+              Tu plan actual no incluye subdepartamentos de finanzas. Habla con contacto@evangelic.app para subir de
+              plan.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {error && (
           <Alert variant="destructive" className="mt-6">

@@ -133,6 +133,21 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     const message = Array.isArray(body?.message) ? body.message.join(", ") : body?.message;
+
+    // Iglesia oculta por mora (ver frontend/prompt.md): cubre tanto el login
+    // bloqueado (login/page.tsx además redirige sin depender de esto, para una
+    // transición SPA en vez de recarga completa) como una sesión que ya estaba
+    // abierta y se corta a mitad de camino cuando el SuperAdmin oculta la
+    // iglesia — cualquier request a partir de ahí cae acá.
+    if (res.status === 403 && (body as { code?: string } | null)?.code === "IGLESIA_SUSPENDIDA") {
+      setCsrfToken(null);
+      useAuthStore.getState().clearSession();
+      if (typeof window !== "undefined") {
+        const dias = (body as { diasEnMora?: number }).diasEnMora ?? 0;
+        window.location.href = `/cuenta-suspendida?dias=${dias}`;
+      }
+    }
+
     throw new ApiError(res.status, message ?? "Ocurrió un error inesperado", body);
   }
 

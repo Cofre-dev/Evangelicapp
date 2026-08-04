@@ -12,6 +12,7 @@ import { DepartamentoSelector } from "@/components/finanzas/departamento-selecto
 import { ImportarMovimientosDialog } from "@/components/finanzas/importar-movimientos-dialog";
 import { LogsDialog } from "@/components/finanzas/logs-dialog";
 import { MovimientoDialog } from "@/components/finanzas/movimiento-dialog";
+import { planTieneSubdepartamentos } from "@/components/iglesias/types";
 import {
   contextoQueryParam,
   formatoCLP,
@@ -269,7 +270,10 @@ function FinanzasContent() {
           <DepartamentoSelector
             departamentosActivos={departamentosActivos}
             contexto={contexto}
-            esManager={usuario.rol === "MANAGER"}
+            // Gestión de departamentos requiere plan Pro (ver frontend/prompt.md,
+            // sección 9: Básico/Medio no tienen acceso a subdepartamentos) —
+            // se oculta el botón en vez de dejar llegar al usuario al 403.
+            esManager={usuario.rol === "MANAGER" && Boolean(usuario.iglesia && planTieneSubdepartamentos(usuario.iglesia.plan))}
           />
         </div>
 

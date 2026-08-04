@@ -53,6 +53,12 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
   const [serverError, setServerError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateUsuarioResponse | null>(null);
   const [copied, setCopied] = useState(false);
+  // No se resetea al cerrar el diálogo a propósito (ver frontend/prompt.md,
+  // límite de usuarios por plan): una vez alcanzado el tope, el botón "Nuevo
+  // usuario" queda deshabilitado por el resto de esta sesión de la página —
+  // no hace falta que sea permanente ni reactivo a otros cambios.
+  const [limiteAlcanzado, setLimiteAlcanzado] = useState(false);
+  const [limiteMensaje, setLimiteMensaje] = useState<string | null>(null);
 
   const form = useForm<CreateUsuarioValues>({
     resolver: zodResolver(createUsuarioSchema),
@@ -88,6 +94,11 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
       setResult(response);
       onCreated(response.usuario);
     } catch (error) {
+      if (error instanceof ApiError && (error.body as { code?: string } | null)?.code === "PLAN_LIMITE_USUARIOS") {
+        setLimiteMensaje(error.message);
+        setLimiteAlcanzado(true);
+        return;
+      }
       setServerError(error instanceof ApiError ? error.message : "No se pudo crear el usuario");
     }
   }
@@ -101,13 +112,25 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button>
+        <Button disabled={limiteAlcanzado} title={limiteAlcanzado ? limiteMensaje ?? undefined : undefined}>
           <UserPlus className="h-4 w-4" />
           Nuevo usuario
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        {result ? (
+        {limiteAlcanzado ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Límite de usuarios alcanzado</DialogTitle>
+              <DialogDescription>{limiteMensaje}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button className="w-full" onClick={() => handleOpenChange(false)}>
+                Entendido
+              </Button>
+            </DialogFooter>
+          </>
+        ) : result ? (
           <>
             <DialogHeader>
               <DialogTitle>Usuario creado</DialogTitle>

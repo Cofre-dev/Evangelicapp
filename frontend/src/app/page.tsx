@@ -3,15 +3,33 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Bell, Building2, CalendarDays, LayoutDashboard, NotebookPen, QrCode, Users, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  Building2,
+  CalendarDays,
+  LayoutDashboard,
+  NotebookPen,
+  QrCode,
+  Users,
+  Wallet,
+} from "lucide-react";
 
 import { ProximosEventos } from "@/components/agenda/proximos-eventos";
 import type { Evento } from "@/components/agenda/types";
+import type { FacturacionResponse } from "@/components/facturacion/types";
 import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, apiFetch } from "@/lib/api";
 import { type Rol, type SessionUser } from "@/stores/auth-store";
+
+/** MANAGER y USUARIO (ver frontend/prompt.md, sección 7 — aviso de facturación
+ * en el dashboard). */
+function tieneAccesoFacturacion(usuario: SessionUser): boolean {
+  return usuario.rol === "MANAGER" || usuario.rol === "USUARIO";
+}
 
 /** Ver frontend/prompt.md: cualquier USUARIO (tenga o no módulos otorgados)
  * puede ver/marcar sus propias tareas asignadas — no depende de `modulos`. */
@@ -94,6 +112,7 @@ export default function Home() {
   const [modalTareasOpen, setModalTareasOpen] = useState(false);
   const [eventosProximos, setEventosProximos] = useState<Evento[]>([]);
   const [loadingEventos, setLoadingEventos] = useState(true);
+  const [facturacion, setFacturacion] = useState<FacturacionResponse | null>(null);
 
   const cargarTareas = useCallback(async () => {
     if (!usuario || !tieneAccesoTareas(usuario)) return;
@@ -129,6 +148,21 @@ export default function Home() {
     }
   }, [usuario]);
 
+  const cargarFacturacion = useCallback(async () => {
+    if (!usuario || !tieneAccesoFacturacion(usuario)) return;
+    try {
+      const data = await apiFetch<FacturacionResponse>("/mi-iglesia/facturacion");
+      setFacturacion(data);
+    } catch {
+      // `GET /mi-iglesia/facturacion` es de alcance MANAGER (mismo que
+      // /mi-iglesia, ver frontend/prompt.md sección 7), pero el aviso de este
+      // dashboard se pide también para USUARIO — si el backend responde 403
+      // para ese rol, el banner simplemente no aparece en vez de romper el
+      // resto del home. Contradicción señalada en FEATURES.md, no resuelta
+      // en silencio.
+    }
+  }, [usuario]);
+
   useEffect(() => {
     cargarTareas();
   }, [cargarTareas]);
@@ -136,6 +170,10 @@ export default function Home() {
   useEffect(() => {
     cargarEventosProximos();
   }, [cargarEventosProximos]);
+
+  useEffect(() => {
+    cargarFacturacion();
+  }, [cargarFacturacion]);
 
   function onTareaActualizada(tarea: Nota) {
     setTareas((prev) => (tarea.estado === "EN_REVISION" ? prev.map((t) => (t.id === tarea.id ? tarea : t)) : prev.filter((t) => t.id !== tarea.id)));
@@ -198,6 +236,42 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {facturacion && (facturacion.facturacion.color === "AMARILLO" || facturacion.facturacion.color === "ROJO") && (
+          <Link
+            href="/facturacion"
+            className={`mt-6 flex items-center gap-4 rounded-2xl border p-5 text-left shadow-sm transition-colors ${
+              facturacion.facturacion.color === "ROJO"
+                ? "border-destructive/30 bg-destructive/10 hover:bg-destructive/15"
+                : "border-amber-200 bg-amber-50 hover:bg-amber-100"
+            }`}
+          >
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                facturacion.facturacion.color === "ROJO" ? "bg-destructive/15 text-destructive" : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <p
+                className={`text-base font-semibold ${
+                  facturacion.facturacion.color === "ROJO" ? "text-destructive" : "text-amber-900"
+                }`}
+              >
+                {facturacion.facturacion.enMora
+                  ? `Tu facturación está vencida hace ${facturacion.facturacion.diasEnMora} día${facturacion.facturacion.diasEnMora === 1 ? "" : "s"}`
+                  : `Tu próxima facturación es en ${facturacion.facturacion.diasParaFacturacion} día${facturacion.facturacion.diasParaFacturacion === 1 ? "" : "s"}`}
+              </p>
+              <p className={`text-sm ${facturacion.facturacion.color === "ROJO" ? "text-destructive/80" : "text-amber-700"}`}>
+                Revisa el módulo de Facturación
+              </p>
+            </div>
+            <ArrowRight
+              className={`h-5 w-5 shrink-0 ${facturacion.facturacion.color === "ROJO" ? "text-destructive" : "text-amber-700"}`}
+            />
+          </Link>
+        )}
 
         {tareas.length > 0 && (
           <button

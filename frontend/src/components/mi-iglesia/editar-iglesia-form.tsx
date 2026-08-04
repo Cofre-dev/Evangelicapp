@@ -32,6 +32,7 @@ interface EditarIglesiaFormProps {
 
 export function EditarIglesiaForm({ iglesia, onUpdated }: EditarIglesiaFormProps) {
   const updateUsuario = useAuthStore((state) => state.updateUsuario);
+  const usuarioActual = useAuthStore((state) => state.usuario);
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -74,10 +75,15 @@ export function EditarIglesiaForm({ iglesia, onUpdated }: EditarIglesiaFormProps
         }),
       });
       onUpdated(actualizada);
-      // El navbar/home muestran usuario.iglesia.{nombre,logoUrl} desde la
+      // El navbar/home muestran usuario.iglesia.{nombre,logoUrl,plan} desde la
       // sesión persistida — sin esto, un cambio de nombre acá no se vería
-      // reflejado ahí hasta el próximo login.
-      updateUsuario({ iglesia: { nombre: actualizada.nombre, logoUrl: actualizada.logoUrl } });
+      // reflejado ahí hasta el próximo login. `plan` no lo devuelve este
+      // endpoint (no cambia acá), así que se conserva el que ya está en sesión.
+      if (usuarioActual?.iglesia) {
+        updateUsuario({
+          iglesia: { nombre: actualizada.nombre, logoUrl: actualizada.logoUrl, plan: usuarioActual.iglesia.plan },
+        });
+      }
       setSaved(true);
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "No se pudieron guardar los cambios");

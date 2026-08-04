@@ -35,6 +35,7 @@ interface LogoIglesiaUploaderProps {
 
 export function LogoIglesiaUploader({ iglesia, onUpdated }: LogoIglesiaUploaderProps) {
   const updateUsuario = useAuthStore((state) => state.updateUsuario);
+  const usuarioActual = useAuthStore((state) => state.usuario);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +67,13 @@ export function LogoIglesiaUploader({ iglesia, onUpdated }: LogoIglesiaUploaderP
         body: formData,
       });
       onUpdated(actualizada);
-      updateUsuario({ iglesia: { nombre: actualizada.nombre, logoUrl: actualizada.logoUrl } });
+      // `plan` no lo devuelve este endpoint (no cambia acá) — se conserva el
+      // que ya está en sesión, ver mismo criterio en editar-iglesia-form.tsx.
+      if (usuarioActual?.iglesia) {
+        updateUsuario({
+          iglesia: { nombre: actualizada.nombre, logoUrl: actualizada.logoUrl, plan: usuarioActual.iglesia.plan },
+        });
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo subir el logo");
     } finally {
