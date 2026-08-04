@@ -6,6 +6,29 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-08-04 — Recuperación de contraseña (forgot/reset password)
+
+**Por qué**: no había forma de recuperar el acceso si un usuario olvidaba su contraseña — la única salida era que otro MANAGER/SUPER_ADMIN se lo reseteara a mano. El backend implementó el flujo completo de recuperación por correo (repo separado, sin tipos compartidos); esta entrada documenta el lado frontend, ya probado end-to-end contra la base real (Supabase) en la sesión anterior: se pidió el reset para el SUPER_ADMIN real, llegó el correo por Resend, se validó el token, se cambió la contraseña, se confirmó que el token quedó usado y las sesiones previas revocadas, y se hizo login con la contraseña nueva.
+
+**Contrato de backend** (las 3 rutas son públicas, sin sesión ni CSRF):
+- `POST /auth/forgot-password` — body `{ email }`. Siempre responde `200 { message }` genérico, exista o no la cuenta (no filtra existencia). Rate limit de 3 req/hora/IP → `429` si se excede.
+- `GET /auth/reset-password/:token` — `200 { valid: true }` si el token existe, no está usado y no expiró; `404` genérico en cualquier otro caso (no distingue no-existe/expirado/usado, ni el frontend intenta distinguirlo).
+- `POST /auth/reset-password/:token` — body `{ password }`. `204` sin body si funciona; mismo `404` genérico que el `GET`; `400` si la password no cumple mínimo 8 caracteres + al menos una letra y un número. El link del correo apunta a `${FRONTEND_URL}/recuperar-password/:token`. Token vence a los 60 minutos.
+
+**Qué se implementó**:
+
+- **`src/app/login/page.tsx`**: link "¿Olvidaste tu contraseña?" junto al label del campo password, apunta a `/recuperar-password`.
+- **`src/app/recuperar-password/page.tsx`** (nueva, pública): form de email, llama `POST /auth/forgot-password` y muestra siempre el mismo mensaje de éxito ("Si el correo está registrado, te llegará un link...") sin importar si la cuenta existe o no — refleja la genericidad del backend en vez de inferir nada del resultado. Un error real (ej. `429`) sí se muestra inline.
+- **`src/app/recuperar-password/[token]/page.tsx`** (nueva, pública): valida el token al montar con el `GET`; mientras no hay respuesta muestra un loader, si falla (404, cualquier motivo) muestra "Este link no es válido o ya expiró" con salida a pedir uno nuevo. El form de nueva contraseña usa `zod` con las mismas reglas del backend (`min(8)` + regex de letra y número) para dar feedback antes de pegarle a la API. Si el `POST` responde `404` (el token venció o se usó entre la validación y el submit), vuelve a la vista de "link inválido" en vez de mostrar un error genérico. Al completar, muestra confirmación con un botón a `/login` (no hay redirect automático — se prefirió dejar que la persona confirme el mensaje de éxito antes de salir de la pantalla, no es un descuido).
+- **`src/lib/api.ts`**: las 3 rutas agregadas a `CSRF_EXEMPT_PATHS` (mismo patrón ya usado para `integrantes/registro` y `agenda/*/responder` — rutas públicas autenticadas por token de un solo uso, no por sesión).
+- **`frontend/docs/auth-cookies.md`**: se sumaron las dos rutas nuevas a la lista de ejemplos de rutas exentas de CSRF en la sección correspondiente, mismo criterio que las ya documentadas.
+
+**Verificación**: se confirmó que el código en el working tree corresponde a lo descripto arriba (mensaje genérico sin filtrar existencia de cuenta, manejo de token inválido/expirado, reglas de password client-side alineadas con el backend, exención de CSRF completa). `npm run lint` y `npm run typecheck` limpios. El flujo completo ya se probó manualmente end-to-end contra el backend real (Supabase + Resend) en la sesión de trabajo previa, incluyendo el caso de sesiones revocadas tras el reset — no quedó pendiente de QA funcional.
+
+**Pendiente/bloqueante para producción real (no es tarea de frontend, queda registrado acá para que no se pierda)**: el backend hoy manda estos correos desde `onboarding@resend.dev`, la dirección sandbox de la cuenta free de Resend — **esa dirección solo entrega a la casilla del dueño de la cuenta de Resend**. Ningún usuario real de ninguna iglesia va a recibir el correo de recuperación hasta que se verifique un dominio propio en Resend y se actualice `MAIL_FROM` en el backend con esa dirección. Hasta que eso pase, esta feature funciona en pruebas pero no sirve para usuarios reales.
+
+---
+
 ## 2026-08-03 — Planes comerciales (Básico/Medio/Pro) + Facturación
 
 **Por qué**: el backend implementó planes comerciales, fecha de facturación y bloqueo de acceso por mora (contrato completo en `frontend/prompt.md`, raíz de `frontend/`) — estrategia tipo "bencina 93/95/97": 3 planes con topes de usuarios y de subdepartamentos de finanzas, sin pasarela de pago (los pagos se confirman manualmente por el SuperAdmin), con la iglesia oculta (`estado = SUSPENDIDA`) como mecanismo de bloqueo por mora.

@@ -33,6 +33,8 @@ const CSRF_EXEMPT_PATHS = [
   /^\/integrantes\/registro\//,
   /^\/agenda\/predicadores\/[^/]+\/responder$/,
   /^\/agenda\/asistencias\/[^/]+\/responder$/,
+  /^\/auth\/forgot-password$/,
+  /^\/auth\/reset-password\/[^/]+$/,
 ];
 
 function isCsrfExempt(path: string): boolean {

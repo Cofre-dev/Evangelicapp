@@ -40,7 +40,7 @@ Sin cambios de contrato — el `access_token` ahora se lee de la cookie automát
 
 `CsrfMiddleware` (global, `src/common/middleware/csrf.middleware.ts`) exige, en toda request `POST`/`PUT`/`PATCH`/`DELETE` que traiga `access_token` o `refresh_token` en sus cookies, que el header `X-CSRF-Token` coincida exactamente con el valor de la cookie `csrf_token`. Si no coincide o falta: `403 Forbidden`.
 
-Si la request no trae ninguna cookie de sesión, se deja pasar sin exigir nada — así `POST /auth/login` y la ruta pública `POST /agenda/predicadores/:token/responder` (autenticada por el token de un solo uso, no por sesión) quedan exentas sin necesidad de una lista de exclusión que mantener a mano.
+Si la request no trae ninguna cookie de sesión, se deja pasar sin exigir nada — así `POST /auth/login` y la ruta pública `POST /agenda/predicadores/:token/responder` (autenticada por el token de un solo uso, no por sesión) quedan exentas sin necesidad de una lista de exclusión que mantener a mano. Mismo criterio para `POST /auth/forgot-password` y `GET`/`POST /auth/reset-password/:token` (recuperación de contraseña, 2026-08-04 — ver `FEATURES.md`): son públicas, no requieren sesión, y el `POST /auth/reset-password/:token` se autentica por el token de un solo uso de la URL, no por `X-CSRF-Token`.
 
 **Qué debe hacer el frontend**: en cada request mutante, leer `csrf_token` de `document.cookie` y mandarlo en el header `X-CSRF-Token`. Recomendación: hacerlo en un solo lugar (el wrapper `apiFetch`), no en cada call site.
 
