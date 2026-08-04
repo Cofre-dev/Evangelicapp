@@ -8,6 +8,7 @@ export interface Nota {
   descripcion: string | null;
   fechaLimite: string | null;
   estado: EstadoTarea;
+  archivado: boolean;
   createdAt: string;
   updatedAt: string;
   creadoPor: { nombre: string; apellido: string } | null;

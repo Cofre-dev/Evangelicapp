@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateIglesiaDialog } from "@/components/iglesias/create-iglesia-dialog";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL, type PlanIglesia } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 
@@ -27,6 +28,7 @@ interface DashboardResponse {
     region: string;
     logoUrl: string | null;
     estado: "ACTIVA" | "SUSPENDIDA" | "INACTIVA";
+    plan: PlanIglesia;
     createdAt: string;
     pastor: { nombre: string; apellido: string; email: string } | null;
   }[];
@@ -184,6 +186,7 @@ export default function SuperAdminDashboardPage() {
                       <TableHead>Ubicación</TableHead>
                       <TableHead>Pastor</TableHead>
                       <TableHead>Creada</TableHead>
+                      <TableHead>Plan</TableHead>
                       <TableHead>Estado</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -208,6 +211,11 @@ export default function SuperAdminDashboardPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {new Date(iglesia.createdAt).toLocaleDateString("es-CL")}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`rounded-full px-2 py-1 text-xs font-medium ${PLAN_BADGE_CLASSES[iglesia.plan]}`}>
+                            {PLAN_LABEL[iglesia.plan]}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <span

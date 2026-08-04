@@ -10,10 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
+import type { SessionUser } from "@/stores/auth-store";
 import { CeremoniaFormDialog } from "./ceremonia-form-dialog";
 import { CEREMONIA_CONFIGS, nombrePrincipal, type CeremoniaTipo, type RegistroCeremonia } from "./types";
 
-const ROLES_CON_ACCESO = ["PASTOR", "SECRETARIA"];
+// CEREMONIAS es uno de los 4 módulos delegables (ver frontend/prompt.md): el
+// MANAGER siempre tiene acceso; un USUARIO solo si el MANAGER se lo otorgó
+// desde /accesos.
+function tieneAccesoCeremonias(usuario: SessionUser): boolean {
+  return usuario.rol === "MANAGER" || usuario.modulos.includes("CEREMONIAS");
+}
 
 interface CeremoniasListadoProps {
   tipo: CeremoniaTipo;
@@ -56,7 +62,7 @@ export function CeremoniasListado({ tipo }: CeremoniasListadoProps) {
     return null;
   }
 
-  if (!ROLES_CON_ACCESO.includes(usuario.rol)) {
+  if (!tieneAccesoCeremonias(usuario)) {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">No tienes permisos para ver esta página.</p>

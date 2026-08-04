@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Trash2, X } from "lucide-react";
+import { Loader2, Mail, Trash2, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -31,6 +31,7 @@ const eventoSchema = z
     horaFin: z.string().min(1, "Selecciona la hora de término"),
     ubicacion: z.string().optional(),
     descripcion: z.string().optional(),
+    notificarIntegrantes: z.boolean().optional(),
   })
   .refine(
     (data) => {
@@ -121,6 +122,7 @@ export function EventoDialog({
       horaFin: "10:00",
       ubicacion: "",
       descripcion: "",
+      notificarIntegrantes: false,
     },
   });
 
@@ -146,6 +148,7 @@ export function EventoDialog({
         horaFin: toTimeInputValue(fin),
         ubicacion: evento.ubicacion ?? "",
         descripcion: evento.descripcion ?? "",
+        notificarIntegrantes: false,
       });
     } else {
       const base = defaultDate ?? new Date();
@@ -157,6 +160,7 @@ export function EventoDialog({
         horaFin: "10:00",
         ubicacion: "",
         descripcion: "",
+        notificarIntegrantes: false,
       });
     }
   }, [open, evento, defaultDate, form]);
@@ -203,7 +207,10 @@ export function EventoDialog({
       descripcion: values.descripcion || undefined,
       ...(esEdicion
         ? {}
-        : { predicadores: values.tipo === "CULTO" && predicadoresNuevos.length > 0 ? predicadoresNuevos : undefined }),
+        : {
+            predicadores: values.tipo === "CULTO" && predicadoresNuevos.length > 0 ? predicadoresNuevos : undefined,
+            notificarIntegrantes: values.notificarIntegrantes ?? false,
+          }),
     };
 
     try {
@@ -288,6 +295,13 @@ export function EventoDialog({
                 {esEdicion ? "Actualiza los datos del evento." : "Programa un culto, reunión o limpieza."}
               </DialogDescription>
             </DialogHeader>
+
+            {esEdicion && evento?.notificarIntegrantes && (
+              <div className="flex items-center gap-2 rounded-lg bg-sky-100 px-3 py-2 text-sm font-medium text-sky-700">
+                <Mail className="h-4 w-4 shrink-0" />
+                Se avisó a la congregación por correo
+              </div>
+            )}
 
             <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
@@ -401,6 +415,31 @@ export function EventoDialog({
                 </FormItem>
               )}
             />
+
+            {!esEdicion && (
+              <FormField
+                control={form.control}
+                name="notificarIntegrantes"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start gap-x-2 space-y-0 rounded-lg border border-border bg-muted/40 p-3">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value ?? false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="font-normal">Avisar a la congregación por correo</FormLabel>
+                      <FormDescription>
+                        Se enviará un correo a cada Integrante registrado con un link para confirmar asistencia.
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
 
             {tipoSeleccionado === "CULTO" && (
               <div className="space-y-3 border-t border-border pt-4">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Loader2, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -56,6 +56,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
   const [tipo, setTipo] = useState<TipoNota>(defaultTipo);
   const [serverError, setServerError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [archivando, setArchivando] = useState(false);
   const [equipo, setEquipo] = useState<MiembroEquipo[]>([]);
 
   const form = useForm<NotaValues>({
@@ -128,6 +129,34 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "No se pudo eliminar la nota");
       setDeleting(false);
+    }
+  }
+
+  async function handleArchivar() {
+    if (!usuario || !nota) return;
+    setArchivando(true);
+    setServerError(null);
+    try {
+      await apiFetch(`/notas/${nota.id}/archivar`, { method: "PATCH" });
+      onOpenChange(false);
+      onSaved();
+    } catch (error) {
+      setServerError(error instanceof ApiError ? error.message : "No se pudo archivar el recordatorio");
+      setArchivando(false);
+    }
+  }
+
+  async function handleDesarchivar() {
+    if (!usuario || !nota) return;
+    setArchivando(true);
+    setServerError(null);
+    try {
+      await apiFetch(`/notas/${nota.id}/desarchivar`, { method: "PATCH" });
+      onOpenChange(false);
+      onSaved();
+    } catch (error) {
+      setServerError(error instanceof ApiError ? error.message : "No se pudo desarchivar el recordatorio");
+      setArchivando(false);
     }
   }
 
@@ -227,6 +256,35 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                   )}
                 />
               </>
+            )}
+
+            {esEdicion && nota && esRecordatorio && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3">
+                {nota.archivado ? (
+                  <Button type="button" variant="outline" size="sm" onClick={handleDesarchivar} disabled={archivando}>
+                    {archivando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArchiveRestore className="h-4 w-4" />}
+                    Desarchivar
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleArchivar}
+                      disabled={archivando || nota.estado !== "COMPLETADA"}
+                    >
+                      {archivando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                      Archivar
+                    </Button>
+                    {nota.estado !== "COMPLETADA" && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Solo se pueden archivar recordatorios completados.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
             {serverError && (

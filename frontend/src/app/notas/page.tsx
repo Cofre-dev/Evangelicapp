@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Circle, Clock, Loader2, NotebookPen, Plus, X } from "lucide-react";
+import { Archive, CheckCircle2, Circle, Clock, Eye, EyeOff, Loader2, NotebookPen, Plus, X } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,12 @@ function RecordatorioRow({
               {nota.asignadoA.nombre} {nota.asignadoA.apellido}
             </span>
           )}
+          {nota.archivado && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              <Archive className="h-3 w-3" />
+              Archivado
+            </span>
+          )}
         </div>
       </button>
 
@@ -140,29 +146,33 @@ export default function NotasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
+  const [verArchivados, setVerArchivados] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [notaSeleccionada, setNotaSeleccionada] = useState<Nota | null>(null);
   const [tipoNuevo, setTipoNuevo] = useState<TipoNota>("RECORDATORIO");
 
-  const loadNotas = useCallback(async () => {
-    if (!usuario) return;
-    setLoading(true);
-    setError(null);
+  const loadNotas = useCallback(
+    async (incluirArchivados: boolean) => {
+      if (!usuario) return;
+      setLoading(true);
+      setError(null);
 
-    try {
-      const data = await apiFetch<Nota[]>("/notas");
-      setNotas(data);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron cargar los recordatorios");
-    } finally {
-      setLoading(false);
-    }
-  }, [usuario]);
+      try {
+        const data = await apiFetch<Nota[]>(incluirArchivados ? "/notas?incluirArchivados=true" : "/notas");
+        setNotas(data);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "No se pudieron cargar los recordatorios");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [usuario],
+  );
 
   useEffect(() => {
-    loadNotas();
-  }, [loadNotas]);
+    loadNotas(verArchivados);
+  }, [loadNotas, verArchivados]);
 
   function abrirCreacion(tipo: TipoNota) {
     setTipoNuevo(tipo);
@@ -200,7 +210,7 @@ export default function NotasPage() {
     return null;
   }
 
-  if (usuario.rol !== "PASTOR") {
+  if (usuario.rol !== "MANAGER") {
     return (
       <main className="flex h-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">No tienes permisos para ver esta página.</p>
@@ -212,10 +222,11 @@ export default function NotasPage() {
   }
 
   const recordatorios = notas.filter((n) => n.tipo === "RECORDATORIO");
-  const notasLargas = notas.filter((n) => n.tipo === "NOTA");
+  const notasLargas = notas.filter((n) => n.tipo === "NOTA" && !n.archivado);
 
-  const pendientes = recordatorios.filter((n) => n.estado === "PENDIENTE" || n.estado === "EN_REVISION");
-  const completadas = recordatorios.filter((n) => n.estado === "COMPLETADA");
+  const pendientes = recordatorios.filter((n) => !n.archivado && (n.estado === "PENDIENTE" || n.estado === "EN_REVISION"));
+  const completadas = recordatorios.filter((n) => !n.archivado && n.estado === "COMPLETADA");
+  const archivados = recordatorios.filter((n) => n.archivado);
 
   return (
     <main className="h-full bg-background p-8">
@@ -225,7 +236,11 @@ export default function NotasPage() {
             <h1 className="text-xl font-semibold text-foreground">Notas de recordatorio</h1>
             <p className="mt-1 text-sm text-muted-foreground">Uso exclusivo del pastor.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setVerArchivados((prev) => !prev)}>
+              {verArchivados ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {verArchivados ? "Ocultar archivados" : "Ver archivados"}
+            </Button>
             <Button variant="outline" onClick={() => abrirCreacion("NOTA")}>
               <NotebookPen className="h-4 w-4" />
               Nueva nota
@@ -290,6 +305,29 @@ export default function NotasPage() {
               </div>
             )}
 
+            {verArchivados && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-medium text-muted-foreground">Archivados ({archivados.length})</h2>
+                {archivados.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay recordatorios archivados.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {archivados.map((nota) => (
+                      <RecordatorioRow
+                        key={nota.id}
+                        nota={nota}
+                        onToggle={toggleEstado}
+                        onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
+                        onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
+                        onEdit={abrirEdicion}
+                        procesando={procesandoId === nota.id}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground">Notas ({notasLargas.length})</h2>
               {notasLargas.length === 0 ? (
@@ -311,8 +349,8 @@ export default function NotasPage() {
         onOpenChange={setDialogOpen}
         nota={notaSeleccionada}
         defaultTipo={tipoNuevo}
-        onSaved={loadNotas}
-        onDeleted={loadNotas}
+        onSaved={() => loadNotas(verArchivados)}
+        onDeleted={() => loadNotas(verArchivados)}
       />
     </main>
   );

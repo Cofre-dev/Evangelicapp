@@ -8,8 +8,9 @@ import { Building2, ChevronDown, LogOut, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
 import { API_URL, apiFetch, setCsrfToken } from "@/lib/api";
-import { useAuthStore, type Rol } from "@/stores/auth-store";
+import { useAuthStore, type SessionUser } from "@/stores/auth-store";
 
 /**
  * Un ítem de navegación es un link directo o un grupo colapsable con sub-links
@@ -22,6 +23,16 @@ type NavItem =
   | { type: "link"; href: string; label: string }
   | { type: "group"; label: string; children: { href: string; label: string }[] };
 
+const INICIO_LINK: NavItem = { type: "link", href: "/", label: "Inicio" };
+const AGENDA_LINK: NavItem = { type: "link", href: "/agenda", label: "Agenda" };
+const FINANZAS_LINK: NavItem = { type: "link", href: "/finanzas", label: "Finanzas" };
+const NOTAS_LINK: NavItem = { type: "link", href: "/notas", label: "Notas" };
+const EQUIPO_LINK: NavItem = { type: "link", href: "/equipo", label: "Equipo" };
+const ACCESOS_LINK: NavItem = { type: "link", href: "/accesos", label: "Accesos" };
+const INTEGRANTES_LINK: NavItem = { type: "link", href: "/integrantes", label: "Integrantes" };
+const MI_IGLESIA_LINK: NavItem = { type: "link", href: "/mi-iglesia", label: "Mi iglesia" };
+const FACTURACION_LINK: NavItem = { type: "link", href: "/facturacion", label: "Facturación" };
+
 const CEREMONIAS_GRUPO: NavItem = {
   type: "group",
   label: "Ceremonias",
@@ -33,33 +44,70 @@ const CEREMONIAS_GRUPO: NavItem = {
   ],
 };
 
-const NAV_LINKS: Record<Rol, NavItem[]> = {
-  PASTOR: [
-    { type: "link", href: "/", label: "Inicio" },
-    { type: "link", href: "/agenda", label: "Agenda" },
-    { type: "link", href: "/finanzas", label: "Finanzas" },
-    { type: "link", href: "/notas", label: "Notas" },
-    { type: "link", href: "/usuarios", label: "Equipo" },
-    { type: "link", href: "/integrantes", label: "Integrantes" },
-    CEREMONIAS_GRUPO,
-  ],
-  TESORERO: [
-    { type: "link", href: "/", label: "Inicio" },
-    { type: "link", href: "/agenda", label: "Agenda" },
-    { type: "link", href: "/finanzas", label: "Finanzas" },
-  ],
-  SECRETARIA: [
-    { type: "link", href: "/", label: "Inicio" },
-    { type: "link", href: "/agenda", label: "Agenda" },
-    { type: "link", href: "/integrantes", label: "Integrantes" },
-    CEREMONIAS_GRUPO,
-  ],
-  SUPER_ADMIN: [
-    { type: "link", href: "/", label: "Inicio" },
-    { type: "link", href: "/superadmin", label: "Dashboard" },
-  ],
-  MIEMBRO: [{ type: "link", href: "/", label: "Inicio" }],
+// "Mi perfil" aplica a cualquier rol autenticado (ver frontend/prompt.md,
+// sección 1) — se agrega al final de la lista de cada rol en vez de vivir en
+// un lugar especial de la barra, mismo criterio de link plano que el resto.
+const PERFIL_LINK: NavItem = { type: "link", href: "/perfil", label: "Mi perfil" };
+
+/**
+ * Mapea cada módulo delegable (id devuelto por `GET /accesos/catalogo`, ver
+ * frontend/prompt.md) al ítem de navegación correspondiente. El catálogo puede
+ * crecer a futuro sin cambiar el contrato de la API, pero la ruta/ícono/texto
+ * de un módulo nuevo sí requiere agregar una entrada acá — no hay forma de
+ * inferir eso solo a partir del id que manda el backend. Un módulo del
+ * catálogo que no esté en este mapa simplemente no aparece en el menú.
+ */
+const MODULO_NAV_ITEM: Record<string, NavItem> = {
+  AGENDA: AGENDA_LINK,
+  FINANZAS: FINANZAS_LINK,
+  INTEGRANTES: INTEGRANTES_LINK,
+  CEREMONIAS: CEREMONIAS_GRUPO,
 };
+
+// Orden de prioridad en el que se muestran los módulos delegables que un
+// USUARIO tenga otorgados — criterio propio (no especificado en el brief):
+// mismo orden en que ya aparecían para PASTOR/MANAGER.
+const ORDEN_MODULOS_USUARIO = ["AGENDA", "FINANZAS", "INTEGRANTES", "CEREMONIAS"];
+
+/**
+ * Arma la lista de navegación de la sesión activa. MANAGER ve siempre todo
+ * (Notas/Equipo/Accesos/Mi iglesia son exclusivos suyos, no delegables — ver
+ * frontend/prompt.md); un USUARIO ve Equipo (mismo criterio de acceso que
+ * tenía TESORERO/SECRETARIA antes del rename, no es un módulo delegable) más
+ * los módulos que el MANAGER le haya otorgado vía `modulos`. SUPER_ADMIN y
+ * MIEMBRO no cambian.
+ */
+function buildLinks(usuario: SessionUser): NavItem[] {
+  if (usuario.rol === "MANAGER") {
+    return [
+      INICIO_LINK,
+      AGENDA_LINK,
+      FINANZAS_LINK,
+      NOTAS_LINK,
+      EQUIPO_LINK,
+      ACCESOS_LINK,
+      INTEGRANTES_LINK,
+      CEREMONIAS_GRUPO,
+      MI_IGLESIA_LINK,
+      FACTURACION_LINK,
+      PERFIL_LINK,
+    ];
+  }
+
+  if (usuario.rol === "USUARIO") {
+    const modulosLinks = ORDEN_MODULOS_USUARIO.filter((modulo) => usuario.modulos.includes(modulo)).map(
+      (modulo) => MODULO_NAV_ITEM[modulo],
+    );
+    return [INICIO_LINK, ...modulosLinks, EQUIPO_LINK, PERFIL_LINK];
+  }
+
+  if (usuario.rol === "SUPER_ADMIN") {
+    return [INICIO_LINK, { type: "link", href: "/superadmin", label: "Dashboard" }, PERFIL_LINK];
+  }
+
+  // MIEMBRO
+  return [INICIO_LINK, PERFIL_LINK];
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -69,7 +117,7 @@ export function Navbar() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(new Set());
 
-  const links = usuario ? (NAV_LINKS[usuario.rol] ?? []) : [];
+  const links = usuario ? buildLinks(usuario) : [];
 
   // Si la ruta activa cae dentro de un grupo (ej. entrar directo a
   // /ceremonias/bautizos), lo expande automáticamente para que quede visible
@@ -133,6 +181,11 @@ export function Navbar() {
                 </div>
               )}
               <span className="text-sm text-muted-foreground">{usuario.iglesia.nombre}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE_CLASSES[usuario.iglesia.plan]}`}
+              >
+                {PLAN_LABEL[usuario.iglesia.plan]}
+              </span>
             </div>
           )}
         </div>
@@ -166,7 +219,14 @@ export function Navbar() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">@{usuario.username}</p>
                   {usuario.iglesia && (
-                    <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PLAN_BADGE_CLASSES[usuario.iglesia.plan]}`}
+                      >
+                        {PLAN_LABEL[usuario.iglesia.plan]}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

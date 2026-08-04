@@ -19,13 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import type { UsuarioEquipo } from "./types";
 
 const USERNAME_REGEX = /^[a-z][a-z0-9._]{3,19}$/;
 
+// `POST /usuarios` ya no recibe `rol`: todo usuario creado por el MANAGER nace
+// USUARIO automáticamente (ver frontend/prompt.md) — ya no hay selector de rol
+// (Tesorero/Secretaria) en este formulario.
 const createUsuarioSchema = z.object({
   username: z
     .string()
@@ -35,7 +37,6 @@ const createUsuarioSchema = z.object({
   nombre: z.string().min(1, "Ingresa el nombre"),
   apellido: z.string().min(1, "Ingresa el apellido"),
   telefono: z.string().optional(),
-  rol: z.enum(["TESORERO", "SECRETARIA"], { errorMap: () => ({ message: "Selecciona un rol" }) }),
 });
 
 type CreateUsuarioValues = z.infer<typeof createUsuarioSchema>;
@@ -52,6 +53,12 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
   const [serverError, setServerError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateUsuarioResponse | null>(null);
   const [copied, setCopied] = useState(false);
+  // No se resetea al cerrar el diálogo a propósito (ver frontend/prompt.md,
+  // límite de usuarios por plan): una vez alcanzado el tope, el botón "Nuevo
+  // usuario" queda deshabilitado por el resto de esta sesión de la página —
+  // no hace falta que sea permanente ni reactivo a otros cambios.
+  const [limiteAlcanzado, setLimiteAlcanzado] = useState(false);
+  const [limiteMensaje, setLimiteMensaje] = useState<string | null>(null);
 
   const form = useForm<CreateUsuarioValues>({
     resolver: zodResolver(createUsuarioSchema),
@@ -81,13 +88,17 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
           nombre: values.nombre,
           apellido: values.apellido,
           telefono: values.telefono || undefined,
-          rol: values.rol,
         }),
       });
 
       setResult(response);
       onCreated(response.usuario);
     } catch (error) {
+      if (error instanceof ApiError && (error.body as { code?: string } | null)?.code === "PLAN_LIMITE_USUARIOS") {
+        setLimiteMensaje(error.message);
+        setLimiteAlcanzado(true);
+        return;
+      }
       setServerError(error instanceof ApiError ? error.message : "No se pudo crear el usuario");
     }
   }
@@ -101,13 +112,25 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button>
+        <Button disabled={limiteAlcanzado} title={limiteAlcanzado ? limiteMensaje ?? undefined : undefined}>
           <UserPlus className="h-4 w-4" />
           Nuevo usuario
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        {result ? (
+        {limiteAlcanzado ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Límite de usuarios alcanzado</DialogTitle>
+              <DialogDescription>{limiteMensaje}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button className="w-full" onClick={() => handleOpenChange(false)}>
+                Entendido
+              </Button>
+            </DialogFooter>
+          </>
+        ) : result ? (
           <>
             <DialogHeader>
               <DialogTitle>Usuario creado</DialogTitle>
@@ -174,7 +197,7 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
                     <FormItem>
                       <FormLabel>Correo electrónico</FormLabel>
                       <FormControl>
-                        <Input type="email" autoComplete="email" placeholder="tesorero@iglesia.cl" {...field} />
+                        <Input type="email" autoComplete="email" placeholder="usuario@iglesia.cl" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -220,28 +243,6 @@ export function CreateUsuarioDialog({ onCreated }: { onCreated: (usuario: Usuari
                       <FormControl>
                         <Input type="tel" autoComplete="tel" placeholder="+56 9 1234 5678" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="rol"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rol</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un rol" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="TESORERO">Tesorero</SelectItem>
-                          <SelectItem value="SECRETARIA">Secretaria</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

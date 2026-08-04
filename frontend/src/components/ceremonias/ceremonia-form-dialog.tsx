@@ -37,10 +37,10 @@ function valoresPorDefecto(
       values[campo.name] = String(registro[campo.name] ?? "");
       continue;
     }
-    // Solo se prellena cuando quien crea el registro es el propio pastor de la
-    // sesión — si es SECRETARIA no hay dato del lado del cliente para saber quién
+    // Solo se prellena cuando quien crea el registro es el propio MANAGER de la
+    // sesión — si es un USUARIO no hay dato del lado del cliente para saber quién
     // es el pastor de la iglesia (ver nota en `types.ts`), se deja en blanco.
-    values[campo.name] = campo.prellenarPastor && usuario?.rol === "PASTOR" ? `${usuario.nombre} ${usuario.apellido}` : "";
+    values[campo.name] = campo.prellenarPastor && usuario?.rol === "MANAGER" ? `${usuario.nombre} ${usuario.apellido}` : "";
   }
 
   return values;
@@ -150,7 +150,7 @@ export function CeremoniaFormDialog({ tipo, open, onOpenChange, registro, onSave
                     </FormControl>
                     {campo.prellenarPastor && !esEdicion && (
                       <FormDescription>
-                        {usuario?.rol === "PASTOR"
+                        {usuario?.rol === "MANAGER"
                           ? "Se completó con tu nombre — puedes cambiarlo si ofició otro pastor."
                           : "Ingresa el nombre completo de quien ofició la ceremonia."}
                       </FormDescription>

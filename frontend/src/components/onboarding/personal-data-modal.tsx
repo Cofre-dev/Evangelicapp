@@ -32,10 +32,11 @@ type OnboardingCompleteResponse = SessionUser & {
 };
 
 /**
- * Segundo paso del onboarding obligatorio del pastor. Solo se muestra tras
- * completar el cambio de contraseña (mustChangePassword ya en false) y
- * mientras onboardingCompletado siga en false. El backend solo permite este
- * paso al rol PASTOR, así que la gatilla replica esa misma condición.
+ * Segundo paso del onboarding obligatorio del dueño de cuenta (rol MANAGER,
+ * antes PASTOR). Solo se muestra tras completar el cambio de contraseña
+ * (mustChangePassword ya en false) y mientras onboardingCompletado siga en
+ * false. El backend solo permite este paso al rol MANAGER, así que la gatilla
+ * replica esa misma condición.
  */
 export function PersonalDataOnboardingModal() {
   const usuario = useAuthStore((state) => state.usuario);
@@ -49,7 +50,7 @@ export function PersonalDataOnboardingModal() {
   });
 
   const shouldShow = Boolean(
-    usuario && !usuario.mustChangePassword && !usuario.onboardingCompletado && usuario.rol === "PASTOR",
+    usuario && !usuario.mustChangePassword && !usuario.onboardingCompletado && usuario.rol === "MANAGER",
   );
 
   // Pequeño delay antes de abrir: evita que se solape con la animación de

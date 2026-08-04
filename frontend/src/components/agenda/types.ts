@@ -1,5 +1,6 @@
 export type TipoEvento = "CULTO" | "REUNION" | "LIMPIEZA" | "OTRO";
 export type EstadoConfirmacionPredicador = "PENDIENTE" | "CONFIRMADO" | "RECHAZADO";
+export type EstadoAsistencia = "PENDIENTE" | "CONFIRMADO" | "RECHAZADO";
 
 export interface Predicador {
   id: string;
@@ -19,6 +20,33 @@ export interface Evento {
   ubicacion: string | null;
   colorEtiqueta: string | null;
   predicadores: Predicador[];
+  /** Refleja si se envió (o se va a enviar) convocatoria por correo a los Integrantes. Solo se define al crear. */
+  notificarIntegrantes: boolean;
+}
+
+/**
+ * Shape devuelto por `GET /agenda/asistencias/:token` y
+ * `POST /agenda/asistencias/:token/responder` — ruta pública sin sesión,
+ * análoga a la de predicadores pero para el RSVP de Integrantes.
+ */
+export interface AsistenciaEvento {
+  nombre: string;
+  email: string;
+  estado: EstadoAsistencia;
+  respondidoAt: string | null;
+  evento: {
+    titulo: string;
+    descripcion: string | null;
+    fechaInicio: string;
+    fechaFin: string;
+    ubicacion: string | null;
+  };
+  iglesia: {
+    nombre: string;
+    logoUrl: string | null;
+  };
+  /** Ya viene completamente armado y URL-encoded por el backend — usar tal cual en un <a href>. */
+  googleCalendarLink: string;
 }
 
 export const TIPO_EVENTO_LABEL: Record<TipoEvento, string> = {

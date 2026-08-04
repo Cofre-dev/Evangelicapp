@@ -70,6 +70,11 @@ export default function LoginPage() {
       setSession(response.usuario);
       router.push("/");
     } catch (error) {
+      if (error instanceof ApiError && (error.body as { code?: string } | null)?.code === "IGLESIA_SUSPENDIDA") {
+        const dias = (error.body as { diasEnMora?: number }).diasEnMora ?? 0;
+        router.push(`/cuenta-suspendida?dias=${dias}`);
+        return;
+      }
       setServerError(error instanceof ApiError ? error.message : "No se pudo iniciar sesión");
     }
   }

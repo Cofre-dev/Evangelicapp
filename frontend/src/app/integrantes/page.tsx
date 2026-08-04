@@ -13,9 +13,12 @@ import type { Integrante } from "@/components/integrantes/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 
-// Criterio explícito de `prompt.md` sección 2 (panel admin de Integrantes) —
-// distinto del de otros módulos (ej. agenda usa 3 roles): no copiar de ahí.
-const ROLES_CON_ACCESO = ["PASTOR", "SECRETARIA"];
+// INTEGRANTES es uno de los 4 módulos delegables (ver frontend/prompt.md, brief
+// del rename de roles): el MANAGER siempre tiene acceso; un USUARIO solo si el
+// MANAGER se lo otorgó desde /accesos.
+function tieneAccesoIntegrantes(usuario: { rol: string; modulos: string[] }): boolean {
+  return usuario.rol === "MANAGER" || usuario.modulos.includes("INTEGRANTES");
+}
 
 // "Miembro desde" ahora es una fecha elegida por la persona (puede venir como
 // YYYY-MM-DD o ISO completo) en vez de un año derivado de createdAt. Mientras
@@ -36,7 +39,7 @@ export default function IntegrantesPage() {
   const [eliminarDialogOpen, setEliminarDialogOpen] = useState(false);
   const [paraEliminar, setParaEliminar] = useState<Integrante | null>(null);
 
-  const tieneAcceso = Boolean(usuario && ROLES_CON_ACCESO.includes(usuario.rol));
+  const tieneAcceso = Boolean(usuario && tieneAccesoIntegrantes(usuario));
 
   const cargarIntegrantes = useCallback(async () => {
     if (!usuario || !tieneAcceso) return;
