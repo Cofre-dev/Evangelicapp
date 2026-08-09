@@ -1,114 +1,75 @@
-# Brief para frontend — Rename PASTOR→MANAGER, eliminación de TESORERO/SECRETARIA, nuevo módulo de Accesos
+# Brief para frontend: logoUrl/fotoUrl ahora son URLs absolutas de Supabase Storage
 
-## Qué cambió en el backend (ya implementado y desplegado a la BD de dev)
+## Contexto
 
-1. **Rol `PASTOR` renombrado a `MANAGER`.** Es el mismo dueño de cuenta de siempre (gestiona su
-   equipo, agenda, finanzas, notas, mi iglesia) — solo cambia el string.
-2. **`TESORERO` y `SECRETARIA` desaparecen.** Se reemplazan por un único rol genérico
-   **`USUARIO`**. Ya no existe un rol "de fábrica" con permisos fijos para el equipo — el acceso
-   de cada `USUARIO` a cada módulo del sistema lo otorga el `MANAGER` de forma individual, desde
-   una pantalla nueva (checkbox por módulo, ver más abajo).
-3. `MIEMBRO` y `SUPER_ADMIN` no cambian.
-4. El enum de rol en la API queda: `SUPER_ADMIN | MANAGER | USUARIO | MIEMBRO`.
+El backend migró el storage de logos de iglesia y fotos (perfil, integrantes) de disco local a Supabase Storage (Fase 1 de `docs/supabase.md`, ver entrada `[2026-08-08 21:35]` en `FEATURES.md`). Esto **cambia el formato de los valores que ya te está devolviendo la API** en los campos `logoUrl` y `fotoUrl` — no hay endpoints nuevos ni cambia el flujo de subida.
 
-## Nuevo concepto: módulos delegables
+**Antes:**
+```json
+{ "logoUrl": "/uploads/logos/101c5e46-f563-411c-b8f5-345922628acb.png" }
+```
+Ruta relativa. Para mostrarla en un `<img>` había que prefijarla con la URL del backend (`API_URL` / `BACKEND_URL`, según cómo la tengan nombrada).
 
-Existen 4 módulos que el `MANAGER` puede otorgar a un `USUARIO`, uno a la vez:
-`AGENDA`, `FINANZAS`, `CEREMONIAS`, `INTEGRANTES`. Esta lista puede crecer a futuro sin que
-cambie el contrato de la API (ver `GET /accesos/catalogo` abajo) — el frontend **no debe
-hardcodear** esta lista, debe leerla del backend.
+**Ahora:**
+```json
+{ "logoUrl": "https://lkcgiqmgdefhxhckedga.supabase.co/storage/v1/object/public/logos-iglesias/101c5e46-f563-411c-b8f5-345922628acb.png" }
+```
+URL absoluta, pública, autocontenida. Se usa **tal cual**, sin prefijo.
 
-**Notas/Tareas, Mi Iglesia y Usuarios (gestión de equipo) NO son delegables** — siguen siendo
-exclusivos del `MANAGER`, igual que hoy. La única excepción: cualquier `USUARIO` (sin permiso de
-módulo) sigue pudiendo ver y marcar como hechas **sus propias** tareas asignadas — eso no
-cambia, no requiere ningún checkbox.
+Aplica a los 3 campos: `Iglesia.logoUrl`, `Usuario.fotoUrl`, `Integrante.fotoUrl` (en cualquier endpoint que los devuelva: `GET /mi-iglesia`, `GET /auth/me`, `GET /integrantes`, la respuesta de login, `GET /integrantes/registro/:qrToken`, `GET /agenda/asistencias/:token`, etc.).
 
-## Endpoints nuevos/cambiados
+## Lo que SÍ tiene que cambiar en el frontend
 
-Todos requieren sesión (cookie httpOnly de siempre). Los 3 primeros son **solo `MANAGER`**
-(403 para cualquier otro rol):
+**Buscar y corregir cualquier lugar que concatene una URL base con `logoUrl`/`fotoUrl`.** Ese patrón ahora produce una URL rota (URL absoluta pegada dentro de otra URL). Encontré un caso concreto en el repo, en la carpeta a la que tengo acceso:
 
-- `GET /accesos/catalogo` → `[{ id: "AGENDA", label: "Agenda" }, { id: "FINANZAS", label: "Finanzas" }, ...]`
-  Úsalo para generar dinámicamente las columnas de la pantalla de Accesos.
-- `GET /accesos/usuarios` → lista de usuarios con rol `USUARIO` de la iglesia, cada uno con sus
-  módulos actuales: `[{ id, nombre, apellido, username, fotoUrl, activo, modulos: ["FINANZAS"] }, ...]`
-- `PUT /accesos/usuarios/:usuarioId` con body `{ "modulos": ["AGENDA", "FINANZAS"] }` → reemplaza
-  por completo el set de módulos de ese usuario (marcar/desmarcar un checkbox y guardar debe
-  mandar el array completo resultante, no un diff).
-- `GET /auth/me` (el endpoint que ya usan hoy para cargar el usuario logueado) ahora incluye un
-  campo nuevo **`modulos: string[]`** con los módulos que el usuario actual tiene otorgados
-  (siempre `[]` para `MANAGER`/`SUPER_ADMIN`/`MIEMBRO`, porque su acceso no depende de esta
-  lista). **Usa este campo para decidir qué mostrar en el menú.**
-- `POST /usuarios` (alta de equipo) **ya no recibe `rol` en el body** — todo usuario creado por
-  el `MANAGER` nace con rol `USUARIO` automáticamente. El formulario de alta de usuario debe
-  **quitar el selector de rol** (Tesorero/Secretaria) que tiene hoy.
+- **Archivo:** `frontend/src/app/agenda/asistencia/[token]/page.tsx`, línea 104
+- **Código actual:**
+  ```tsx
+  <Image
+    src={`${API_URL}${data.iglesia.logoUrl}`}
+    alt={`Logo de ${data.iglesia.nombre}`}
+    width={56}
+    height={56}
+  />
+  ```
+- **Corrección:** usar `data.iglesia.logoUrl` directo, sin el prefijo `API_URL`:
+  ```tsx
+  <Image
+    src={data.iglesia.logoUrl}
+    alt={`Logo de ${data.iglesia.nombre}`}
+    width={56}
+    height={56}
+  />
+  ```
+  (Ojo con el `if` que lo envuelve — sigue siendo necesario, `logoUrl` puede venir `null`.)
 
-## Pantalla nueva: "Accesos" (solo visible para MANAGER)
+Solo tengo acceso a esa carpeta del repo de frontend, así que **no pude auditar el resto** — hay que grepear el proyecto completo por los mismos patrones:
+- Cualquier `` `${API_URL}${...logoUrl}` `` / `` `${BACKEND_URL}${...logoUrl}` `` / `` `${API_URL}${...fotoUrl}` ``
+- Pantallas candidatas por lo que existe hoy en el backend: login/sidebar (logo de la iglesia del usuario logueado), perfil de usuario (foto de perfil), listado de integrantes (censo), landing pública de registro por QR, confirmación de predicador/asistencia por email (la que ya encontré).
 
-Una tabla: una fila por usuario (de `GET /accesos/usuarios`), una columna por módulo (de
-`GET /accesos/catalogo`), un checkbox por celda. Al tildar/destildar y guardar, se llama
-`PUT /accesos/usuarios/:usuarioId` con el array completo de módulos marcados para esa fila.
-Como las columnas salen de `/accesos/catalogo`, si el backend agrega un módulo nuevo en el
-futuro, esta pantalla debe mostrar la columna nueva automáticamente, sin cambios de código.
+**Si usan `next/image` (el componente `<Image>` de Next.js, no un `<img>` plano) en alguna de esas pantallas:** Next.js exige que el dominio de cualquier imagen externa esté explícitamente permitido en `next.config.js` (`images.remotePatterns` o `images.domains`), si no tira un error en runtime ("Invalid src prop... hostname is not configured"). Hay que agregar el dominio de Supabase Storage:
+```js
+// next.config.js
+images: {
+  remotePatterns: [
+    { protocol: 'https', hostname: 'lkcgiqmgdefhxhckedga.supabase.co' },
+  ],
+},
+```
+No pude confirmar si esto ya está configurado (no tengo acceso a `next.config.js` en este repo) — hay que revisarlo. Sin este paso, aunque se corrija el bug de concatenación de arriba, la imagen no va a cargar.
 
-Agregar esta pantalla al menú/sidebar solo para `rol === "MANAGER"`.
+Si en algún lugar usan una Content Security Policy (`img-src` en headers/meta), también hay que sumar ese dominio ahí.
 
-## Impacto en el código actual del frontend (ya revisado)
+## Lo que NO cambia (para tranquilidad)
 
-Encontramos estos puntos concretos que hoy dependen de roles fijos y van a necesitar volverse
-dinámicos (basados en `modulos`, no en un `switch`/mapa por rol):
+- **El flujo de subida es idéntico**: mismos endpoints, mismo `multipart/form-data`, mismos nombres de campo (`logo`, `foto`), mismas reglas de validación (mimetype/tamaño máximo) — todo eso sigue viviendo y validándose en el backend, no hay nada nuevo que implementar del lado del envío.
+- **Los nombres de los campos en las respuestas no cambiaron**: siguen siendo `logoUrl` / `fotoUrl`, siguen siendo `string | null`. No hay que tocar tipos/DTOs del frontend, solo cómo se **usa** el valor al armar el `src`.
+- No hay endpoints nuevos que integrar.
 
-- **`src/stores/auth-store.ts`**: el tipo `Rol = "SUPER_ADMIN" | "PASTOR" | "TESORERO" | "SECRETARIA" | "MIEMBRO"`
-  pasa a `"SUPER_ADMIN" | "MANAGER" | "USUARIO" | "MIEMBRO"`. El objeto de usuario persistido
-  debe guardar también el nuevo campo `modulos: string[]` que devuelve `/auth/me`.
-- **`src/components/layout/navbar.tsx`**: el mapa estático `NAV_LINKS: Record<Rol, NavItem[]>`
-  ya no alcanza (antes cada rol tenía su lista fija de links). Reemplazarlo por: los links
-  exclusivos de `MANAGER` se muestran si `rol === "MANAGER"`; los links de Agenda/Finanzas/
-  Ceremonias/Integrantes se muestran si `modulos.includes("AGENDA")` (etc.) **o** si
-  `rol === "MANAGER"` (el manager ve todo, siempre).
-- **`src/app/page.tsx`**: mismo problema en `ACCESOS_POR_ROL`, `ROLES_CON_TAREAS`,
-  `ROLES_CON_AGENDA` — misma solución (data-driven por `modulos` + chequeo de `MANAGER`).
-- **`src/components/usuarios/types.ts`**: `RolEquipo = "TESORERO" | "SECRETARIA"` y su label en
-  español (`ROL_EQUIPO_DIRECTORIO_LABEL`) se eliminan — ya no hay elección de rol al crear un
-  usuario de equipo, solo existe `USUARIO`. El directorio (`/usuarios/equipo`, endpoint que no
-  cambió) ahora solo necesita mostrar "Manager" o "Usuario" según corresponda, sin las etiquetas
-  viejas.
-- No hay `middleware.ts` de rutas — la protección se hace por página/componente leyendo
-  `usuario.rol` desde el store. Los mismos componentes que hoy chequean `rol === "PASTOR"` etc.
-  para ocultar/mostrar secciones deben chequear `modulos` en vez de rol para lo que antes era
-  Tesorero/Secretaria.
+## Checklist de QA sugerido
 
-## Detalle importante de timing (no es un bug, es a propósito)
-
-El backend calcula los `modulos` del usuario **al emitir el access token** (login o refresh),
-no en cada request — el mismo comportamiento que ya existe hoy para `rol` (un cambio de rol
-tampoco se revalida en cada request). Esto significa: si el manager le otorga un módulo nuevo a
-alguien que ya tiene sesión iniciada, el menú puede tardar hasta ~15 min (vida del access token)
-en poder **usar** ese módulo en la API, aunque `GET /auth/me` (que sí es fresco) ya lo muestre
-antes en el menú. Es el mismo trade-off que ya existe hoy para cambios de rol, no es nuevo.
-Si esto genera una mala experiencia (usuario ve el link en el menú pero la API le da 403), avisen
-y evaluamos forzar un refresh de token al guardar accesos — no se implementó porque no fue
-pedido explícitamente y agregaría complejidad no solicitada.
-
-## ⚠️ Pendiente de confirmar con backend (encontrado durante la implementación)
-
-Al probar el flujo real de "crear usuario → iniciar sesión con ese usuario", `POST /auth/login`
-devolvió un `usuario` **sin el campo `modulos`** (`undefined`, no `[]`). El brief solo menciona
-explícitamente que `GET /auth/me` incluye `modulos` — la respuesta de `POST /auth/login` no está
-mencionada, pero el frontend usa el `usuario` de login directamente (vía `setSession`) para
-decidir qué mostrar en el navbar/home antes de que se dispare ningún `/auth/me`, así que también
-necesita `modulos` ahí. Se agregó una normalización defensiva en el frontend (`setSession` en
-`auth-store.ts` cae a `[]` si `modulos` no viene), así que esto no bloquea, pero **`POST /auth/login`
-debería devolver `modulos: string[]` en `usuario` igual que `/auth/me`** para que un `USUARIO`
-recién logueado vea sus módulos reales desde el primer render, no una lista vacía hasta el
-próximo `/auth/me` (o hasta el próximo refresh de token, ~15 min después).
-
-## Checklist para el equipo de frontend
-
-- [x] Actualizar el tipo `Rol` (quitar PASTOR/TESORERO/SECRETARIA, agregar MANAGER/USUARIO).
-- [x] Guardar `modulos: string[]` en el store de auth, tomado de `/auth/me` y del login.
-- [x] Nueva pantalla de Accesos (solo MANAGER) consumiendo `/accesos/catalogo`, `/accesos/usuarios`, `PUT /accesos/usuarios/:id`.
-- [x] Sidebar/menú y home (`page.tsx`) data-driven por `modulos` en vez de mapas fijos por rol.
-- [x] Formulario de alta de usuario: quitar selector de rol.
-- [x] Quitar `RolEquipo`/labels de Tesorero-Secretaria del directorio de equipo.
-- [x] Revisar cualquier otro `if (rol === "TESORERO" ...)` o `"SECRETARIA"` suelto en el código (búsqueda de texto) que no hayamos listado acá.
+- [ ] Grepear todo el repo de frontend por `logoUrl` y `fotoUrl` y revisar cada uso.
+- [ ] Confirmar que ningún lugar sigue prefijando esos valores con `API_URL`/`BACKEND_URL`.
+- [ ] Si usan `next/image`, agregar `lkcgiqmgdefhxhckedga.supabase.co` a `images.remotePatterns` en `next.config.js`.
+- [ ] Probar visualmente: logo de iglesia (dashboard/sidebar), foto de perfil, censo de integrantes, landing pública de registro QR, y la pantalla de confirmación de asistencia por email (`agenda/asistencia/[token]`) que ya sé que tiene el bug.
+- [ ] Verificar que sigue mostrando el estado vacío correctamente cuando `logoUrl`/`fotoUrl` es `null` (no cambió esa lógica, pero vale la pena confirmar junto con lo demás).

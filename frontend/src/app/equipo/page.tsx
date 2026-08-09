@@ -15,7 +15,7 @@ import {
   type UsuarioEquipoDirectorio,
 } from "@/components/usuarios/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 // Mismo criterio de acceso que tenía el directorio antes del rename de roles
 // (PASTOR/TESORERO/SECRETARIA podían verlo, MIEMBRO no) — ahora consolidado en
@@ -157,7 +157,7 @@ export default function EquipoPage() {
                 >
                   {miembro.fotoUrl ? (
                     <Image
-                      src={`${API_URL}${miembro.fotoUrl}`}
+                      src={miembro.fotoUrl}
                       alt={`Foto de ${miembro.nombre}`}
                       width={72}
                       height={72}

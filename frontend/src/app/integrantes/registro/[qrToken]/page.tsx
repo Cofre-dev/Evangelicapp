@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 interface IglesiaRegistro {
   nombre: string;
@@ -218,7 +218,7 @@ export default function RegistroIntegrantePage() {
             <div className="flex flex-col items-center gap-3 py-2 text-center">
               {confirmacion.fotoUrl ? (
                 <Image
-                  src={`${API_URL}${confirmacion.fotoUrl}`}
+                  src={confirmacion.fotoUrl}
                   alt={confirmacion.nombreCompleto}
                   width={80}
                   height={80}
@@ -241,7 +241,7 @@ export default function RegistroIntegrantePage() {
               <div className="flex flex-col items-center gap-2 text-center">
                 {iglesia.logoUrl ? (
                   <Image
-                    src={`${API_URL}${iglesia.logoUrl}`}
+                    src={iglesia.logoUrl}
                     alt={`Logo de ${iglesia.nombre}`}
                     width={56}
                     height={56}

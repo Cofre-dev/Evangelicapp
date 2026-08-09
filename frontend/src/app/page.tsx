@@ -10,7 +10,7 @@ import type { Evento } from "@/components/agenda/types";
 import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { API_URL, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { type Rol, type SessionUser } from "@/stores/auth-store";
 
 /** Ver frontend/prompt.md: cualquier USUARIO (tenga o no módulos otorgados)
@@ -181,7 +181,7 @@ export default function Home() {
               <div className="flex flex-col items-center gap-3 sm:items-end">
                 {usuario.iglesia.logoUrl ? (
                   <Image
-                    src={`${API_URL}${usuario.iglesia.logoUrl}`}
+                    src={usuario.iglesia.logoUrl}
                     alt={`Logo de ${usuario.iglesia.nombre}`}
                     width={88}
                     height={88}

@@ -8,7 +8,7 @@ import { Building2, ChevronDown, LogOut, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { API_URL, apiFetch, setCsrfToken } from "@/lib/api";
+import { apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type SessionUser } from "@/stores/auth-store";
 
 /**
@@ -166,7 +166,7 @@ export function Navbar() {
             <div className="hidden items-center gap-2 border-l border-border pl-6 sm:flex">
               {usuario.iglesia.logoUrl ? (
                 <Image
-                  src={`${API_URL}${usuario.iglesia.logoUrl}`}
+                  src={usuario.iglesia.logoUrl}
                   alt={`Logo de ${usuario.iglesia.nombre}`}
                   width={24}
                   height={24}
@@ -197,7 +197,7 @@ export function Navbar() {
               <div className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-accent/40 px-3 py-3">
                 {usuario.iglesia?.logoUrl ? (
                   <Image
-                    src={`${API_URL}${usuario.iglesia.logoUrl}`}
+                    src={usuario.iglesia.logoUrl}
                     alt={`Logo de ${usuario.iglesia.nombre}`}
                     width={36}
                     height={36}

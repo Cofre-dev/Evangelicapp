@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
         port: apiUrl.port,
         pathname: "/uploads/**",
       },
+      // logoUrl/fotoUrl (Iglesia/Usuario/Integrante) ahora son URLs absolutas
+      // de Supabase Storage (Fase 1 de docs/supabase.md), no rutas relativas
+      // del backend. Bucket público, no requiere credenciales.
+      {
+        protocol: "https",
+        hostname: "lkcgiqmgdefhxhckedga.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
   },
 };

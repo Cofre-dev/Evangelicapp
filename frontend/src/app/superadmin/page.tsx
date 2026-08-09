@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateIglesiaDialog } from "@/components/iglesias/create-iglesia-dialog";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 interface DashboardResponse {
   totales: {
@@ -73,7 +73,7 @@ function IglesiaLogo({ logoUrl, nombre }: { logoUrl: string | null; nombre: stri
 
   return (
     <Image
-      src={`${API_URL}${logoUrl}`}
+      src={logoUrl}
       alt={`Logo de ${nombre}`}
       width={32}
       height={32}
