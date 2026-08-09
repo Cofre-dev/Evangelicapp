@@ -6,6 +6,25 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-08-09 — Confirmaciones de asistencia por evento, y plan/facturación en Finanzas y Mi iglesia
+
+**Por qué**: tres pedidos del founder (contrato completo en `frontend/prompt.md`, raíz de `frontend/`), documentados ahí como ya implementados por otra sesión con acceso directo al repo. Esta entrada deja constancia en la bitácora (según la convención del repo) y agrega la verificación que faltaba: revisión de los 9 archivos tocados contra el contrato descrito, y `lint`/`typecheck`/`build` de producción sobre el árbol completo (el registro previo solo mencionaba `tsc`/`eslint` archivo por archivo).
+
+1. **`GET /agenda/eventos/:id/asistencias`** (endpoint nuevo de backend, repo separado — no verificable desde acá): lista quién confirmó/rechazó/no respondió la convocatoria de un evento, ordenado por `nombreCompleto`. Consumido en `src/components/agenda/asistencias-dialog.tsx` (nuevo), con un botón "Ver asistencia" en `evento-dialog.tsx` que solo aparece editando un evento existente con `notificarIntegrantes: true` (junto al badge "Se avisó a la congregación por correo"). Agrupa en 3 secciones con contador: Confirmaron / Sin responder / Rechazaron. Tipos nuevos en `src/components/agenda/types.ts` (`EstadoAsistencia`, `AsistenciaResumen`).
+2. **`iglesia.plan` en la sesión**: `SessionUser.iglesia` (`src/stores/auth-store.ts`) ganó `plan: "BASICO" | "MEDIO" | "PRO"` — ya viajaba en `/auth/login` y `/auth/me` desde el 2026-08-03 (entrada "Planes comerciales"), el frontend no lo tenía tipado. `src/app/finanzas/page.tsx` oculta "Exportar todo consolidado" si el plan es `BASICO`/`MEDIO` (`PLAN_LIMITS.maxDepartamentosFinancieros = 0` en esos planes — el consolidado sería idéntico al general). `editar-iglesia-form.tsx` y `logo-iglesia-uploader.tsx` pisaban `usuario.iglesia` completo al guardar nombre/logo sin incluir `plan`; ahora hacen spread del `iglesia` existente en la sesión antes de aplicar los campos que sí cambian, para no perderlo.
+3. **`GET /mi-iglesia/facturacion`** (existía en backend desde el 2026-08-03, sin consumidor en frontend): tarjeta nueva "Plan" en `/mi-iglesia` (`src/components/mi-iglesia/plan-card.tsx`, montada al final de la página) — informativa, sin pasarela de pago. Badge de plan, semáforo de facturación (punto de color + días para/de mora), cupo de usuarios (`actuales/máximo`), y un `mailto:` a `contacto@evangelic.app` con asunto pre-armado para pedir upgrade, visible solo si `plan !== "PRO"`. Tipos en `src/components/mi-iglesia/types.ts` (`PlanIglesia`, `ColorFacturacion`, `MiIglesiaFacturacion`).
+
+**Fix menor de paso**: los 3 comentarios nuevos en `plan-card.tsx`/`types.ts`/`finanzas/page.tsx` referenciaban `backend/prompt.md` (archivo que no existe en este repo — el backend vive en un repo separado sin código ni docs compartidos, ver `CLAUDE.md`). Corregidos a `frontend/prompt.md`, que es donde vive el contrato real.
+
+**Pendiente/abierto** (señalado también en `frontend/prompt.md`):
+- **Smoke test end-to-end** sin hacer todavía: crear un evento CULTO con "Avisar a la congregación por correo" activado, responder una invitación desde el link público, y confirmar que "Ver asistencia" en el dialog de edición refleja el cambio. Requiere backend + base de datos corriendo, no disponible desde este repo.
+- **Sesiones ya persistidas en `localStorage` antes de este cambio** no tienen `plan` hasta el próximo login — mientras tanto el botón de exportar consolidado se comporta como antes (no oculta nada que debería ocultar). Se autocorrige solo en el siguiente login; no se bumpeó la versión del persist de zustand porque no es un cambio de shape rompiente.
+- **Resto del módulo de Facturación** (pantalla de cuenta suspendida por mora, acciones de SuperAdmin para marcar pagos u ocultar una iglesia), especificado en un brief anterior del 2026-08-03, sigue sin construir — no fue parte de este pedido.
+
+**Verificación**: `npm run lint`, `npm run typecheck` y `npm run build` (producción) pasan limpios sobre el árbol completo del repo. **No se corrió el frontend contra un backend real** — falta la pasada de QA end-to-end descrita arriba.
+
+---
+
 ## 2026-08-08 (continuación) — Fix: logoUrl/fotoUrl ahora son URLs absolutas de Supabase Storage (frontend)
 
 **Por qué**: el backend (repo separado, sin código ni docs compartidos con este) migró el storage de logos de iglesia y fotos (perfil, integrantes) de disco local a Supabase Storage (Fase 1 según el brief recibido — `docs/supabase.md` y la entrada `[2026-08-08 21:35]` que cita viven en el repo del backend, no en este). Contrato completo tal como llegó, en `frontend/prompt.md` (raíz de `frontend/`). `logoUrl`/`fotoUrl` (`Iglesia`, `Usuario`, `Integrante`) dejaron de ser rutas relativas (`/uploads/logos/xxx.png`) y pasaron a ser URLs absolutas y públicas de Supabase (`https://lkcgiqmgdefhxhckedga.supabase.co/storage/v1/object/public/...`). No cambió el flujo de subida (mismos endpoints, mismo `multipart/form-data`) ni los nombres/tipos de los campos — solo el formato del valor a la hora de armar el `src` de una imagen.

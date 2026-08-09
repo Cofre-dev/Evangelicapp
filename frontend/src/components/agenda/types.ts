@@ -74,3 +74,24 @@ export const ESTADO_PREDICADOR_CLASS: Record<EstadoConfirmacionPredicador, strin
   CONFIRMADO: "bg-emerald-100 text-emerald-700",
   RECHAZADO: "bg-red-100 text-red-700",
 };
+
+export const ESTADO_ASISTENCIA_LABEL: Record<EstadoAsistencia, string> = {
+  PENDIENTE: "Sin responder",
+  CONFIRMADO: "Confirmó",
+  RECHAZADO: "Rechazó",
+};
+
+export const ESTADO_ASISTENCIA_CLASS: Record<EstadoAsistencia, string> = {
+  PENDIENTE: "bg-muted text-muted-foreground",
+  CONFIRMADO: "bg-emerald-100 text-emerald-700",
+  RECHAZADO: "bg-red-100 text-red-700",
+};
+
+/** Shape de `GET /agenda/eventos/:id/asistencias` (MANAGER/USUARIO con módulo AGENDA). */
+export interface AsistenciaResumen {
+  integranteId: string;
+  nombreCompleto: string;
+  email: string;
+  estado: EstadoAsistencia;
+  respondidoAt: string | null;
+}

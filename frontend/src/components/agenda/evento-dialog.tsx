@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Mail, Trash2, X } from "lucide-react";
+import { Loader2, Mail, Trash2, Users, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { AsistenciasDialog } from "./asistencias-dialog";
 import {
   ESTADO_PREDICADOR_CLASS,
   ESTADO_PREDICADOR_LABEL,
@@ -111,6 +112,7 @@ export function EventoDialog({
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [asistenciasOpen, setAsistenciasOpen] = useState(false);
 
   const form = useForm<EventoValues>({
     resolver: zodResolver(eventoSchema),
@@ -297,9 +299,19 @@ export function EventoDialog({
             </DialogHeader>
 
             {esEdicion && evento?.notificarIntegrantes && (
-              <div className="flex items-center gap-2 rounded-lg bg-sky-100 px-3 py-2 text-sm font-medium text-sky-700">
-                <Mail className="h-4 w-4 shrink-0" />
-                Se avisó a la congregación por correo
+              <div className="flex items-center justify-between gap-2 rounded-lg bg-sky-100 px-3 py-2 text-sm font-medium text-sky-700">
+                <span className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  Se avisó a la congregación por correo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAsistenciasOpen(true)}
+                  className="flex items-center gap-1 rounded-full bg-sky-200/70 px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-200"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Ver asistencia
+                </button>
               </div>
             )}
 
@@ -538,6 +550,15 @@ export function EventoDialog({
           </>
         )}
       </DialogContent>
+
+      {evento && (
+        <AsistenciasDialog
+          open={asistenciasOpen}
+          onOpenChange={setAsistenciasOpen}
+          eventoId={evento.id}
+          eventoTitulo={evento.titulo}
+        />
+      )}
     </Dialog>
   );
 }

@@ -34,6 +34,7 @@ interface LogoIglesiaUploaderProps {
 }
 
 export function LogoIglesiaUploader({ iglesia, onUpdated }: LogoIglesiaUploaderProps) {
+  const usuario = useAuthStore((state) => state.usuario);
   const updateUsuario = useAuthStore((state) => state.updateUsuario);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,7 +67,12 @@ export function LogoIglesiaUploader({ iglesia, onUpdated }: LogoIglesiaUploaderP
         body: formData,
       });
       onUpdated(actualizada);
-      updateUsuario({ iglesia: { nombre: actualizada.nombre, logoUrl: actualizada.logoUrl } });
+      // `plan` no lo devuelve este PATCH (no cambia acá) — se preserva el de la sesión.
+      if (usuario?.iglesia) {
+        updateUsuario({
+          iglesia: { ...usuario.iglesia, nombre: actualizada.nombre, logoUrl: actualizada.logoUrl },
+        });
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo subir el logo");
     } finally {

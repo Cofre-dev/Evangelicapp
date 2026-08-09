@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditarIglesiaForm } from "@/components/mi-iglesia/editar-iglesia-form";
 import { LogoIglesiaUploader } from "@/components/mi-iglesia/logo-iglesia-uploader";
+import { PlanCard } from "@/components/mi-iglesia/plan-card";
 import type { MiIglesia } from "@/components/mi-iglesia/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -109,6 +110,8 @@ export default function MiIglesiaPage() {
                 <EditarIglesiaForm iglesia={iglesia} onUpdated={setIglesia} />
               </CardContent>
             </Card>
+
+            <PlanCard />
           </>
         ) : null}
       </div>

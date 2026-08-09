@@ -1,75 +1,71 @@
-# Brief para frontend: logoUrl/fotoUrl ahora son URLs absolutas de Supabase Storage
+# Brief: confirmaciones de asistencia + plan/facturación en Finanzas y Mi iglesia
 
-## Contexto
+Contexto: esta sesión implementó 3 pedidos del founder que eran principalmente de frontend. Tuve acceso directo al repo de frontend (carpeta `agenda/asistencia` como working directory adicional, pero desde ahí pude navegar y editar el resto del repo) y ya apliqué los 3 cambios ahí mismo. Este documento es el registro del contrato de API para que quede trazable — no es un pedido pendiente.
 
-El backend migró el storage de logos de iglesia y fotos (perfil, integrantes) de disco local a Supabase Storage (Fase 1 de `docs/supabase.md`, ver entrada `[2026-08-08 21:35]` en `FEATURES.md`). Esto **cambia el formato de los valores que ya te está devolviendo la API** en los campos `logoUrl` y `fotoUrl` — no hay endpoints nuevos ni cambia el flujo de subida.
+## 1. Nuevo endpoint: `GET /agenda/eventos/:id/asistencias`
 
-**Antes:**
+Antes no existía forma de ver, para un evento ya convocado por correo, quién confirmó/rechazó/no respondió — el dato vivía en la tabla `asistencias_evento` pero no había ningún endpoint que lo listara agregado por evento (solo el flujo público de un integrante viendo/respondiendo su propia invitación vía `agenda/asistencias/:token`).
+
+- **Guards:** los mismos que el resto de `EventosController` — `JwtAuthGuard`, `RolesGuard`, `ModuloAccessGuard`, `@Roles(MANAGER, USUARIO)`, `@Modulo(AGENDA)`. No lo até solo a `MANAGER` aunque el pedido original decía "el manager debe poder ver" — lo mantuve consistente con el resto del módulo (un USUARIO con el módulo Agenda delegado ya puede crear/editar el mismo evento, así que tiene sentido que también vea sus confirmaciones). Si el founder quiere restringirlo solo a MANAGER, es cambiar el decorator en `eventos.controller.ts`.
+- **Validación:** reutiliza `EventosService#findOne` internamente, que ya filtra por `iglesiaId` del JWT — un manager no puede consultar asistencias de un evento de otra iglesia adivinando el id.
+
+**Response** (`200`, array):
+
 ```json
-{ "logoUrl": "/uploads/logos/101c5e46-f563-411c-b8f5-345922628acb.png" }
+[
+  {
+    "integranteId": "cl123...",
+    "nombreCompleto": "Juana Pérez",
+    "email": "juana@example.com",
+    "estado": "CONFIRMADO",
+    "respondidoAt": "2026-08-08T14:32:00.000Z"
+  }
+]
 ```
-Ruta relativa. Para mostrarla en un `<img>` había que prefijarla con la URL del backend (`API_URL` / `BACKEND_URL`, según cómo la tengan nombrada).
 
-**Ahora:**
-```json
-{ "logoUrl": "https://lkcgiqmgdefhxhckedga.supabase.co/storage/v1/object/public/logos-iglesias/101c5e46-f563-411c-b8f5-345922628acb.png" }
-```
-URL absoluta, pública, autocontenida. Se usa **tal cual**, sin prefijo.
+`estado` es `"PENDIENTE" | "CONFIRMADO" | "RECHAZADO"`. `respondidoAt` es `null` mientras esté `PENDIENTE`. Viene ordenado por `nombreCompleto` ascendente. Si el evento no fue convocado (`notificarIntegrantes: false` al crearlo) o no había Integrantes en la iglesia en ese momento, devuelve `[]`.
 
-Aplica a los 3 campos: `Iglesia.logoUrl`, `Usuario.fotoUrl`, `Integrante.fotoUrl` (en cualquier endpoint que los devuelva: `GET /mi-iglesia`, `GET /auth/me`, `GET /integrantes`, la respuesta de login, `GET /integrantes/registro/:qrToken`, `GET /agenda/asistencias/:token`, etc.).
+**Ya consumido en frontend:** `components/agenda/asistencias-dialog.tsx` (nuevo), enganchado a un botón "Ver asistencia" en `EventoDialog` que aparece junto al badge "Se avisó a la congregación por correo" (o sea, solo cuando `evento.notificarIntegrantes` es `true` y se está editando un evento existente). Agrupa los resultados en 3 secciones con contador: Confirmaron / Sin responder / Rechazaron.
 
-## Lo que SÍ tiene que cambiar en el frontend
+## 2. `iglesia.plan` ya viaja en la sesión — el frontend simplemente no lo estaba usando
 
-**Buscar y corregir cualquier lugar que concatene una URL base con `logoUrl`/`fotoUrl`.** Ese patrón ahora produce una URL rota (URL absoluta pegada dentro de otra URL). Encontré un caso concreto en el repo, en la carpeta a la que tengo acceso:
+No fue necesario ningún cambio de backend acá: `SafeUsuario.iglesia.plan` existe desde el 2026-08-03 (ver `FEATURES.md`, entrada "Planes comerciales") y viaja en `/auth/login` y `/auth/me` para cualquier rol de la iglesia, no solo MANAGER. El frontend nunca lo había tipado ni usado.
 
-- **Archivo:** `frontend/src/app/agenda/asistencia/[token]/page.tsx`, línea 104
-- **Código actual:**
-  ```tsx
-  <Image
-    src={`${API_URL}${data.iglesia.logoUrl}`}
-    alt={`Logo de ${data.iglesia.nombre}`}
-    width={56}
-    height={56}
-  />
-  ```
-- **Corrección:** usar `data.iglesia.logoUrl` directo, sin el prefijo `API_URL`:
-  ```tsx
-  <Image
-    src={data.iglesia.logoUrl}
-    alt={`Logo de ${data.iglesia.nombre}`}
-    width={56}
-    height={56}
-  />
-  ```
-  (Ojo con el `if` que lo envuelve — sigue siendo necesario, `logoUrl` puede venir `null`.)
+Cambios aplicados en frontend:
+- `stores/auth-store.ts`: `SessionUser.iglesia` ahora incluye `plan: "BASICO" | "MEDIO" | "PRO"`.
+- `app/finanzas/page.tsx`: el botón "Exportar todo consolidado" ya no se renderiza si `usuario.iglesia?.plan` es `BASICO` o `MEDIO` (esos planes tienen `PLAN_LIMITS.maxDepartamentosFinancieros = 0` — no hay subdepartamentos, así que el consolidado sería idéntico al general).
+- Dos call-sites que pisaban `usuario.iglesia` en el store después de guardar nombre/logo (`components/mi-iglesia/editar-iglesia-form.tsx`, `components/mi-iglesia/logo-iglesia-uploader.tsx`) hacían `updateUsuario({ iglesia: { nombre, logoUrl } })` sin `plan` — ahora spread del `iglesia` existente en la sesión primero, para no perder el plan al guardar esos formularios.
 
-Solo tengo acceso a esa carpeta del repo de frontend, así que **no pude auditar el resto** — hay que grepear el proyecto completo por los mismos patrones:
-- Cualquier `` `${API_URL}${...logoUrl}` `` / `` `${BACKEND_URL}${...logoUrl}` `` / `` `${API_URL}${...fotoUrl}` ``
-- Pantallas candidatas por lo que existe hoy en el backend: login/sidebar (logo de la iglesia del usuario logueado), perfil de usuario (foto de perfil), listado de integrantes (censo), landing pública de registro por QR, confirmación de predicador/asistencia por email (la que ya encontré).
+**Nota de degradación conocida:** una sesión que ya estaba guardada en `localStorage` antes de este cambio no tiene `plan` hasta el próximo login — mientras tanto el botón de exportar consolidado se ve igual que antes (falla "abierto", no oculta nada que debería verse). Se autocorrige en el siguiente login; no bump-eé la versión del persist de zustand para esto porque no es una migración de shape rompiente como la de `PASTOR→MANAGER`.
 
-**Si usan `next/image` (el componente `<Image>` de Next.js, no un `<img>` plano) en alguna de esas pantallas:** Next.js exige que el dominio de cualquier imagen externa esté explícitamente permitido en `next.config.js` (`images.remotePatterns` o `images.domains`), si no tira un error en runtime ("Invalid src prop... hostname is not configured"). Hay que agregar el dominio de Supabase Storage:
-```js
-// next.config.js
-images: {
-  remotePatterns: [
-    { protocol: 'https', hostname: 'lkcgiqmgdefhxhckedga.supabase.co' },
-  ],
-},
-```
-No pude confirmar si esto ya está configurado (no tengo acceso a `next.config.js` en este repo) — hay que revisarlo. Sin este paso, aunque se corrija el bug de concatenación de arriba, la imagen no va a cargar.
+## 3. `GET /mi-iglesia/facturacion` — existía en el backend, nadie lo llamaba
 
-Si en algún lugar usan una Content Security Policy (`img-src` en headers/meta), también hay que sumar ese dominio ahí.
+Este endpoint (`solo MANAGER`) existe desde el 2026-08-03 y devuelve plan, semáforo de facturación (`facturacion.color`: `VERDE`/`AMARILLO`/`ROJO`, `diasParaFacturacion`, `enMora`, `diasEnMora`) y uso actual contra los topes del plan (`limites.usuarios`, `limites.departamentosFinancieros`). Nunca había un componente de frontend que lo consumiera.
 
-## Lo que NO cambia (para tranquilidad)
+Agregué una tarjeta "Plan" en `/mi-iglesia` (`components/mi-iglesia/plan-card.tsx`) — informativa, no interactiva (no hay pasarela de pago todavía, ver `docs/supabase.md`/`README.md`). Muestra:
+- Badge con el plan (`Básico`/`Medio`/`Pro`).
+- Semáforo de facturación en una línea (punto de color + "Próxima facturación en N días" o "Facturación vencida hace N días").
+- Cupo de usuarios (`actuales / máximo`).
+- El texto pedido por el founder — "Si quieres subir de plan, manda un correo a contacto@evangelic.app con el asunto 'Solicitud de upgrade de plan — Iglesia...'" — **solo si `plan !== "PRO"`**. El link es un `mailto:` con el asunto ya armado (`Solicitud de upgrade de plan — {nombre de la iglesia}`).
 
-- **El flujo de subida es idéntico**: mismos endpoints, mismo `multipart/form-data`, mismos nombres de campo (`logo`, `foto`), mismas reglas de validación (mimetype/tamaño máximo) — todo eso sigue viviendo y validándose en el backend, no hay nada nuevo que implementar del lado del envío.
-- **Los nombres de los campos en las respuestas no cambiaron**: siguen siendo `logoUrl` / `fotoUrl`, siguen siendo `string | null`. No hay que tocar tipos/DTOs del frontend, solo cómo se **usa** el valor al armar el `src`.
-- No hay endpoints nuevos que integrar.
+**Alcance deliberadamente acotado:** no construí el resto del módulo de Facturación que había quedado especificado en el brief del 2026-08-03 (pantalla de cuenta suspendida por mora, acciones de SuperAdmin para marcar pagos u ocultar una iglesia) — eso no fue parte de lo que pidió el founder en esta sesión. Si se quiere retomar, esa parte sigue pendiente y sin construir en el frontend.
 
-## Checklist de QA sugerido
+## Archivos tocados
 
-- [ ] Grepear todo el repo de frontend por `logoUrl` y `fotoUrl` y revisar cada uso.
-- [ ] Confirmar que ningún lugar sigue prefijando esos valores con `API_URL`/`BACKEND_URL`.
-- [ ] Si usan `next/image`, agregar `lkcgiqmgdefhxhckedga.supabase.co` a `images.remotePatterns` en `next.config.js`.
-- [ ] Probar visualmente: logo de iglesia (dashboard/sidebar), foto de perfil, censo de integrantes, landing pública de registro QR, y la pantalla de confirmación de asistencia por email (`agenda/asistencia/[token]`) que ya sé que tiene el bug.
-- [ ] Verificar que sigue mostrando el estado vacío correctamente cuando `logoUrl`/`fotoUrl` es `null` (no cambió esa lógica, pero vale la pena confirmar junto con lo demás).
+**Backend:**
+- `src/modules/agenda/eventos.service.ts` (+`findAsistencias`)
+- `src/modules/agenda/eventos.controller.ts` (+`GET :id/asistencias`)
+
+**Frontend** (repo separado, mismo working tree):
+- `src/stores/auth-store.ts`
+- `src/app/finanzas/page.tsx`
+- `src/app/mi-iglesia/page.tsx`
+- `src/components/mi-iglesia/types.ts`
+- `src/components/mi-iglesia/plan-card.tsx` (nuevo)
+- `src/components/mi-iglesia/editar-iglesia-form.tsx`
+- `src/components/mi-iglesia/logo-iglesia-uploader.tsx`
+- `src/components/agenda/types.ts`
+- `src/components/agenda/asistencias-dialog.tsx` (nuevo)
+- `src/components/agenda/evento-dialog.tsx`
+
+Verificado con `tsc --noEmit` y `eslint` en ambos repos (sin errores en los archivos tocados). No corrí el frontend en el navegador ni levanté la base de datos para probar el endpoint nuevo end-to-end — recomiendo un smoke test manual antes de dar esto por cerrado: crear un evento CULTO con "Avisar a la congregación por correo" activado, responder una invitación desde el link público, y confirmar que "Ver asistencia" en el dialog de edición del evento refleja el cambio.

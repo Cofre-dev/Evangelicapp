@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type Rol = "SUPER_ADMIN" | "MANAGER" | "USUARIO" | "MIEMBRO";
+export type PlanIglesia = "BASICO" | "MEDIO" | "PRO";
 
 export interface SessionUser {
   id: string;
@@ -13,7 +14,7 @@ export interface SessionUser {
   fotoUrl: string | null;
   rol: Rol;
   iglesiaId: string | null;
-  iglesia: { nombre: string; logoUrl: string | null } | null;
+  iglesia: { nombre: string; logoUrl: string | null; plan: PlanIglesia } | null;
   mustChangePassword: boolean;
   onboardingCompletado: boolean;
   /** Módulos delegables (`AGENDA`/`FINANZAS`/`CEREMONIAS`/`INTEGRANTES`, catálogo
