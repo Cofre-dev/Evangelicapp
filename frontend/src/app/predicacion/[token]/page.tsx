@@ -7,7 +7,7 @@ import { Building2, Check, Loader2, X } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 type EstadoConfirmacion = "PENDIENTE" | "CONFIRMADO" | "RECHAZADO";
 
@@ -77,7 +77,7 @@ export default function PredicacionPage() {
             <div className="flex flex-col items-center gap-2 text-center">
               {data.iglesia.logoUrl ? (
                 <Image
-                  src={`${API_URL}${data.iglesia.logoUrl}`}
+                  src={data.iglesia.logoUrl}
                   alt={`Logo de ${data.iglesia.nombre}`}
                   width={56}
                   height={56}

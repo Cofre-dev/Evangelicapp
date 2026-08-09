@@ -11,7 +11,7 @@ import { EliminarIntegranteDialog } from "@/components/integrantes/eliminar-inte
 import { QrDialog } from "@/components/integrantes/qr-dialog";
 import type { Integrante } from "@/components/integrantes/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 // INTEGRANTES es uno de los 4 módulos delegables (ver frontend/prompt.md, brief
 // del rename de roles): el MANAGER siempre tiene acceso; un USUARIO solo si el
@@ -140,7 +140,7 @@ export default function IntegrantesPage() {
                   <div className="rounded-full bg-[linear-gradient(135deg,hsl(199_84%_62%),hsl(203_66%_42%))] p-[3px] shadow-md">
                     {integrante.fotoUrl ? (
                       <Image
-                        src={`${API_URL}${integrante.fotoUrl}`}
+                        src={integrante.fotoUrl}
                         alt={integrante.nombreCompleto}
                         width={96}
                         height={96}

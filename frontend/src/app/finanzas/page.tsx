@@ -308,10 +308,19 @@ function FinanzasContent() {
             <Upload className="h-4 w-4" />
             Importar
           </Button>
-          <Button variant="outline" onClick={exportarConsolidado} disabled={exportando !== null}>
-            {exportando === "consolidado" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Exportar todo consolidado
-          </Button>
+          {/* Planes sin subdepartamentos (ver planTieneSubdepartamentos, frontend/prompt.md
+              de "Planes comerciales"): el consolidado sería idéntico al general, así que
+              el botón no aporta nada en esos planes y solo confunde. */}
+          {usuario.iglesia && planTieneSubdepartamentos(usuario.iglesia.plan) && (
+            <Button variant="outline" onClick={exportarConsolidado} disabled={exportando !== null}>
+              {exportando === "consolidado" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Exportar todo consolidado
+            </Button>
+          )}
           <Button variant="outline" onClick={exportarActual} disabled={exportando !== null}>
             {exportando === "actual" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Exportar {nombreContextoActual}

@@ -6,7 +6,7 @@ import { Loader2, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import type { PerfilResponse } from "./types";
 
@@ -73,7 +73,7 @@ export function FotoPerfilUploader() {
     }
   }
 
-  const fotoActual = preview ?? (usuario?.fotoUrl ? `${API_URL}${usuario.fotoUrl}` : null);
+  const fotoActual = preview ?? usuario?.fotoUrl ?? null;
 
   return (
     <div className="flex items-center gap-4">

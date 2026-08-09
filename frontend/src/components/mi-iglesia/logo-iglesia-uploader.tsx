@@ -6,7 +6,7 @@ import { Building2, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import type { MiIglesia } from "./types";
 
@@ -84,7 +84,7 @@ export function LogoIglesiaUploader({ iglesia, onUpdated }: LogoIglesiaUploaderP
     }
   }
 
-  const logoActual = preview ?? (iglesia.logoUrl ? `${API_URL}${iglesia.logoUrl}` : null);
+  const logoActual = preview ?? iglesia.logoUrl ?? null;
 
   return (
     <div className="flex items-center gap-4">

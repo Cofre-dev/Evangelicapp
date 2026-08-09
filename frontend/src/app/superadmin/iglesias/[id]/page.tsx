@@ -20,7 +20,7 @@ import {
   type PlanIglesia,
 } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 interface MiembroEquipo {
   id: string;
@@ -195,7 +195,7 @@ export default function IglesiaDetallePage() {
               <div className="flex items-start gap-4">
                 {data.logoUrl ? (
                   <Image
-                    src={`${API_URL}${data.logoUrl}`}
+                    src={data.logoUrl}
                     alt={`Logo de ${data.nombre}`}
                     width={56}
                     height={56}

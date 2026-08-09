@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ModuloCatalogo, UsuarioAccesos } from "@/components/accesos/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { API_URL, ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 interface Fila {
   usuario: UsuarioAccesos;
@@ -172,7 +172,7 @@ export default function AccesosPage() {
                           <div className="flex items-center gap-3">
                             {fila.usuario.fotoUrl ? (
                               <Image
-                                src={`${API_URL}${fila.usuario.fotoUrl}`}
+                                src={fila.usuario.fotoUrl}
                                 alt={`Foto de ${fila.usuario.nombre}`}
                                 width={36}
                                 height={36}
