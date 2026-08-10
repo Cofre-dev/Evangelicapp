@@ -6,6 +6,18 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-08-09 — `object-contain` en todos los renders de `logoUrl` (logo ya no viene garantizado cuadrado)
+
+**Por qué**: brief del backend en `frontend/prompt.md` (Fase 2 de `docs/supabase.md`, resize/optimización con `sharp` antes de subir a Supabase Storage — sigue a la Fase 1 documentada en la entrada de abajo). No cambia el contrato de API. Sí cambia el comportamiento: `Iglesia.logoUrl` ahora se ajusta a máx. 512×512 **sin recortar** (`fit: inside`, preserva aspect ratio — un logo horizontal puede terminar en algo como 512×341), mientras que `Usuario.fotoUrl`/`Integrante.fotoUrl` sí quedan siempre 256×256 exacto (`fit: cover`). El brief solo pudo revisar un archivo (acceso parcial al repo) y señaló `agenda/asistencia/[token]/page.tsx:104` como caso concreto de una caja fija circular con `object-cover`, que recortaría un logo no cuadrado.
+
+**Qué se hizo**: se buscó todo render de `logoUrl` vía `next/image` en caja fija (cuadrada o circular) y se cambió `object-cover` → `object-contain` en las 9 instancias encontradas, en 8 archivos: `app/page.tsx` (home, 88×88), `app/superadmin/page.tsx` (`IglesiaLogo`, tabla, 32×32), `app/superadmin/iglesias/[id]/page.tsx` (56×56), `app/integrantes/registro/[qrToken]/page.tsx` (56×56), `app/predicacion/[token]/page.tsx` (56×56), `app/agenda/asistencia/[token]/page.tsx` (56×56, el caso original del brief), `components/layout/navbar.tsx` (dos instancias: 24×24 y 36×36 en el menú mobile), `components/mi-iglesia/logo-iglesia-uploader.tsx` (80×80). Fotos de perfil/integrante (`fotoUrl`) no se tocaron — el brief confirma que ya vienen garantizado cuadradas, así que `object-cover` sigue siendo correcto ahí.
+
+**Verificación**: `npm run typecheck` y `npm run lint` pasan limpios. No se hizo smoke test visual contra un logo no cuadrado real (pendiente si se quiere confirmar visualmente).
+
+`frontend/prompt.md` se vació — brief completamente consumido (mismo criterio que el commit `fb46f59` en `main`).
+
+---
+
 ## 2026-08-09 — Merge de `testing` a `features`: confirmaciones de asistencia por evento + fix de logoUrl/fotoUrl + reconciliación del módulo de planes/facturación
 
 **Por qué**: la rama `testing` había implementado 3 cosas de forma independiente a `features` (partiendo del mismo punto de divergencia, commit `0514d68`): el fix de URLs absolutas de Supabase Storage (`logoUrl`/`fotoUrl`), las confirmaciones de asistencia por evento, y una versión propia — más chica y sin saberlo redundante — del módulo de planes/facturación que `features` ya había construido de forma más completa el 2026-08-03 (entrada debajo). Esta entrada documenta qué se trajo tal cual, qué se descartó por redundante, y qué conflictos reales apareció al mezclar ambos.

@@ -223,7 +223,7 @@ export default function Home() {
                     alt={`Logo de ${usuario.iglesia.nombre}`}
                     width={88}
                     height={88}
-                    className="h-20 w-20 rounded-full border-4 border-card object-cover shadow-md sm:h-22 sm:w-22"
+                    className="h-20 w-20 rounded-full border-4 border-card object-contain shadow-md sm:h-22 sm:w-22"
                   />
                 ) : (
                   <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-card bg-primary/15 text-primary shadow-md">

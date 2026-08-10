@@ -173,7 +173,7 @@ export function Navbar() {
                   alt={`Logo de ${usuario.iglesia.nombre}`}
                   width={24}
                   height={24}
-                  className="h-6 w-6 rounded-full border border-border object-cover"
+                  className="h-6 w-6 rounded-full border border-border object-contain"
                 />
               ) : (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-primary">
@@ -209,7 +209,7 @@ export function Navbar() {
                     alt={`Logo de ${usuario.iglesia.nombre}`}
                     width={36}
                     height={36}
-                    className="h-9 w-9 shrink-0 rounded-full border border-border object-cover"
+                    className="h-9 w-9 shrink-0 rounded-full border border-border object-contain"
                   />
                 ) : (
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-primary">

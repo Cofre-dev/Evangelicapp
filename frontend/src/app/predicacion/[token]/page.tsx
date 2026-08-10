@@ -81,7 +81,7 @@ export default function PredicacionPage() {
                   alt={`Logo de ${data.iglesia.nombre}`}
                   width={56}
                   height={56}
-                  className="h-14 w-14 rounded-full border border-border object-cover"
+                  className="h-14 w-14 rounded-full border border-border object-contain"
                 />
               ) : (
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary">

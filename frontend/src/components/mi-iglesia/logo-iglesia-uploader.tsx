@@ -96,7 +96,7 @@ export function LogoIglesiaUploader({ iglesia, onUpdated }: LogoIglesiaUploaderP
             width={80}
             height={80}
             unoptimized={Boolean(preview)}
-            className="h-20 w-20 rounded-full border border-border object-cover"
+            className="h-20 w-20 rounded-full border border-border object-contain"
           />
         ) : (
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent text-primary">

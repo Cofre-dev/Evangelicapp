@@ -79,7 +79,7 @@ function IglesiaLogo({ logoUrl, nombre }: { logoUrl: string | null; nombre: stri
       alt={`Logo de ${nombre}`}
       width={32}
       height={32}
-      className="h-8 w-8 shrink-0 rounded-full border border-border object-cover"
+      className="h-8 w-8 shrink-0 rounded-full border border-border object-contain"
     />
   );
 }
