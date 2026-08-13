@@ -49,6 +49,18 @@ export function setCsrfToken(token: string | null): void {
   csrfToken = token;
 }
 
+// El socket de Realtime (ver useSocket) necesita reconectar con la cookie
+// access_token nueva después de cada refresh exitoso — mientras una conexión
+// WebSocket está viva no vuelve a mandar cookies por su cuenta, así que si no
+// se reconecta explícitamente queda pegado al token viejo hasta que el
+// servidor la corte por expirado (ver frontend/prompt.md, sección 1).
+const refreshListeners = new Set<() => void>();
+
+export function onSessionRefreshed(listener: () => void): () => void {
+  refreshListeners.add(listener);
+  return () => refreshListeners.delete(listener);
+}
+
 async function rawFetch(path: string, options: ApiFetchOptions): Promise<Response> {
   const { headers, ...rest } = options;
   const method = (rest.method ?? "GET").toUpperCase();
@@ -78,6 +90,7 @@ async function refreshSession(): Promise<boolean> {
     if (!res.ok) return false;
     const body = await res.json().catch(() => null);
     if (body?.csrfToken) setCsrfToken(body.csrfToken);
+    refreshListeners.forEach((listener) => listener());
     return true;
   };
 

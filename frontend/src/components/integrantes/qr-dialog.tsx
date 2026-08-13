@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import QRCode from "qrcode";
-import { AlertTriangle, Check, Copy, Download, Loader2, QrCode, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, Copy, Download, Loader2, QrCode, RefreshCw, User, Users } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useSocket } from "@/hooks/use-socket";
 import { ApiError, apiFetch } from "@/lib/api";
-import type { QrInfo } from "./types";
+import type { IntegranteRegistradoPayload, QrInfo } from "./types";
 
 export function QrDialog() {
   const [open, setOpen] = useState(false);
@@ -27,6 +29,8 @@ export function QrDialog() {
   const [copiado, setCopiado] = useState(false);
   const [confirmandoRegenerar, setConfirmandoRegenerar] = useState(false);
   const [regenerando, setRegenerando] = useState(false);
+  const [recienCensados, setRecienCensados] = useState<IntegranteRegistradoPayload[]>([]);
+  const socket = useSocket();
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -42,11 +46,28 @@ export function QrDialog() {
     if (!open) return;
     setLoading(true);
     setError(null);
+    setRecienCensados([]);
     apiFetch<QrInfo>("/integrantes/qr")
       .then(setQrInfo)
       .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudo cargar el código QR"))
       .finally(() => setLoading(false));
   }, [open]);
+
+  // Realtime (ver frontend/prompt.md): censo en vivo mientras el diálogo está
+  // abierto — pensado para proyectar en pantalla durante el evento. La lista
+  // se reinicia cada vez que se abre (arriba), no persiste entre aperturas.
+  useEffect(() => {
+    if (!socket || !open) return;
+
+    function onIntegranteRegistrado(integrante: IntegranteRegistradoPayload) {
+      setRecienCensados((prev) => [integrante, ...prev]);
+    }
+
+    socket.on("integrante:registrado", onIntegranteRegistrado);
+    return () => {
+      socket.off("integrante:registrado", onIntegranteRegistrado);
+    };
+  }, [socket, open]);
 
   useEffect(() => {
     if (!qrInfo) {
@@ -92,7 +113,7 @@ export function QrDialog() {
           Código QR
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Código QR de tu iglesia</DialogTitle>
           <DialogDescription>
@@ -128,6 +149,45 @@ export function QrDialog() {
               <p className="truncate text-xs text-muted-foreground" title={qrInfo.urlRegistro}>
                 {qrInfo.urlRegistro}
               </p>
+            </div>
+
+            <div className="min-w-0 space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                <p className="text-sm font-medium text-foreground">Recién censados</p>
+                {recienCensados.length > 0 && (
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">{recienCensados.length}</span>
+                )}
+              </div>
+              {recienCensados.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Todavía nadie se ha registrado con este código en esta sesión.
+                </p>
+              ) : (
+                <div className="max-h-48 space-y-1.5 overflow-y-auto">
+                  {recienCensados.map((integrante) => (
+                    <div
+                      key={integrante.id}
+                      className="flex items-center gap-2 rounded-md bg-card px-2 py-1.5 text-sm shadow-sm"
+                    >
+                      {integrante.fotoUrl ? (
+                        <Image
+                          src={integrante.fotoUrl}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="h-6 w-6 shrink-0 rounded-full border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-primary">
+                          <User className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                      <span className="truncate text-foreground">{integrante.nombreCompleto}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {error && (

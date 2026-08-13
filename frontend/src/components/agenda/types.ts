@@ -25,6 +25,20 @@ export interface Evento {
 }
 
 /**
+ * Payload del evento de socket `predicador:respondio` (Realtime, ver
+ * frontend/prompt.md) — se dispara cuando un predicador confirma o rechaza
+ * desde el link público del email. `predicadorId` matchea contra `Predicador.id`.
+ */
+export interface PredicadorRespondioPayload {
+  eventoId: string;
+  predicadorId: string;
+  nombre: string;
+  email: string;
+  estado: EstadoConfirmacionPredicador;
+  respondidoAt: string;
+}
+
+/**
  * Shape devuelto por `GET /agenda/asistencias/:token` y
  * `POST /agenda/asistencias/:token/responder` — ruta pública sin sesión,
  * análoga a la de predicadores pero para el RSVP de Integrantes.

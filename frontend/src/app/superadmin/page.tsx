@@ -1,100 +1,34 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Building2, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CreateIglesiaDialog } from "@/components/iglesias/create-iglesia-dialog";
-import { PLAN_BADGE_CLASSES, PLAN_LABEL, type PlanIglesia } from "@/components/iglesias/types";
+import { HorizontalBars } from "@/components/dashboard/horizontal-bars";
+import { StatTile } from "@/components/dashboard/stat-tile";
+import { TrendArea } from "@/components/dashboard/trend-area";
+import { VerticalBars } from "@/components/dashboard/vertical-bars";
+import { formatHoraUTC, formatMesCorto, formatRangoFechas } from "@/components/dashboard/format";
+import type { SuperAdminDashboardResponse } from "@/components/dashboard/types";
+import { IglesiaLogo } from "@/components/iglesias/iglesia-logo";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL, type IglesiaListItem } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useSocket } from "@/hooks/use-socket";
 import { ApiError, apiFetch } from "@/lib/api";
 
-interface DashboardResponse {
-  totales: {
-    iglesias: number;
-    iglesiasActivas: number;
-    pastores: number;
-  };
-  porRegion: { region: string; cantidad: number }[];
-  iglesias: {
-    id: string;
-    nombre: string;
-    comuna: string;
-    region: string;
-    logoUrl: string | null;
-    estado: "ACTIVA" | "SUSPENDIDA" | "INACTIVA";
-    plan: PlanIglesia;
-    createdAt: string;
-    pastor: { nombre: string; apellido: string; email: string } | null;
-  }[];
-}
-
-function StatTile({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-foreground">{value.toLocaleString("es-CL")}</p>
-    </div>
-  );
-}
-
-function RegionBars({ data }: { data: { region: string; cantidad: number }[] }) {
-  const max = Math.max(...data.map((d) => d.cantidad), 1);
-
-  return (
-    <div className="space-y-3">
-      {data.map((d) => (
-        <div key={d.region} className="flex items-center gap-3">
-          <span className="w-32 shrink-0 truncate text-sm text-foreground">{d.region}</span>
-          <div className="h-4 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${Math.max((d.cantidad / max) * 100, 4)}%` }}
-            />
-          </div>
-          <span className="w-8 shrink-0 text-right text-sm font-medium text-foreground">{d.cantidad}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function IglesiaLogo({ logoUrl, nombre }: { logoUrl: string | null; nombre: string }) {
-  if (!logoUrl) {
-    return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-primary">
-        <Building2 className="h-4 w-4" />
-      </div>
-    );
-  }
-
-  return (
-    <Image
-      src={logoUrl}
-      alt={`Logo de ${nombre}`}
-      width={32}
-      height={32}
-      className="h-8 w-8 shrink-0 rounded-full border border-border object-contain"
-    />
-  );
-}
-
-const ESTADO_LABEL: Record<DashboardResponse["iglesias"][number]["estado"], string> = {
-  ACTIVA: "Activa",
-  SUSPENDIDA: "Suspendida",
-  INACTIVA: "Inactiva",
+const CERTIFICADOS_LABEL: Record<keyof SuperAdminDashboardResponse["certificados"]["porTipo"], string> = {
+  matrimonios: "Matrimonios",
+  bautizos: "Bautizos",
+  defunciones: "Defunciones",
+  presentaciones: "Presentaciones",
 };
 
 export default function SuperAdminDashboardPage() {
-  const router = useRouter();
   const { usuario, ready } = useRequireAuth();
 
-  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [data, setData] = useState<SuperAdminDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,7 +37,7 @@ export default function SuperAdminDashboardPage() {
     setError(null);
 
     try {
-      const response = await apiFetch<DashboardResponse>("/superadmin/dashboard");
+      const response = await apiFetch<SuperAdminDashboardResponse>("/superadmin/dashboard");
       setData(response);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar el dashboard");
@@ -115,6 +49,32 @@ export default function SuperAdminDashboardPage() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  const socket = useSocket();
+
+  // Realtime (ver frontend/prompt.md): parcha la fila en "Iglesias recientes"
+  // sin refetch. No agrega filas nuevas — esa lista es "recién creadas", no
+  // "recién actualizadas", y el propio evento nunca se dispara para un alta
+  // (`iglesia:actualizada` solo cubre las 4 acciones de facturación/estado
+  // sobre una iglesia ya existente).
+  useEffect(() => {
+    if (!socket) return;
+
+    function onIglesiaActualizada(iglesia: IglesiaListItem) {
+      setData((prev) => {
+        if (!prev || !prev.iglesiasRecientes.some((i) => i.id === iglesia.id)) return prev;
+        return {
+          ...prev,
+          iglesiasRecientes: prev.iglesiasRecientes.map((i) => (i.id === iglesia.id ? iglesia : i)),
+        };
+      });
+    }
+
+    socket.on("iglesia:actualizada", onIglesiaActualizada);
+    return () => {
+      socket.off("iglesia:actualizada", onIglesiaActualizada);
+    };
+  }, [socket]);
 
   if (!ready || !usuario) {
     return null;
@@ -134,12 +94,9 @@ export default function SuperAdminDashboardPage() {
   return (
     <main className="h-full bg-background p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Dashboard SuperAdmin</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Vista global de todas las iglesias de la plataforma.</p>
-          </div>
-          <CreateIglesiaDialog onCreated={() => loadDashboard()} />
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Panel de control</h1>
+          <p className="mt-1 text-sm text-muted-foreground">El pulso de la red de iglesias en la plataforma.</p>
         </div>
 
         {error && (
@@ -151,87 +108,144 @@ export default function SuperAdminDashboardPage() {
         {loading ? (
           <div className="mt-10 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando dashboard...
+            Cargando dashboard…
           </div>
         ) : data ? (
           <>
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <StatTile label="Iglesias" value={data.totales.iglesias} />
-              <StatTile label="Iglesias activas" value={data.totales.iglesiasActivas} />
-              <StatTile label="Pastores" value={data.totales.pastores} />
+            {/* Hero: pulso de actividad — abre con "¿está viva la red ahora?",
+                el trabajo real de esta pantalla, en vez de una fila de KPIs
+                genérica. Único lugar de la app junto con la tira de "tiempo de
+                uso" del home de Manager/Usuario que usa --chart-accent. */}
+            <div className="mt-6 rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-8">
+              <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Usuarios activos hoy</p>
+                  <p className="mt-1 font-display text-5xl tabular-nums text-foreground">
+                    {data.totales.usuariosActivosHoy.toLocaleString("es-CL")}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {data.totales.usuariosActivosSemana.toLocaleString("es-CL")} en la última semana
+                  </p>
+                </div>
+                <div className="w-full sm:max-w-md">
+                  <TrendArea
+                    data={data.actividad.porDia.map((p) => ({ fecha: p.fecha, value: p.sesiones }))}
+                    ariaLabel="Sesiones por día, últimos 30 días"
+                    caption={
+                      data.actividad.porDia.length > 0
+                        ? `${formatRangoFechas(data.actividad.porDia[0].fecha, data.actividad.porDia[data.actividad.porDia.length - 1].fecha)} · sesiones por día`
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <StatTile label="Iglesias activas" value={data.totales.iglesiasActivas.toLocaleString("es-CL")} />
+              <StatTile
+                label="Iglesias suspendidas"
+                value={data.totales.iglesiasSuspendidas.toLocaleString("es-CL")}
+                tone={data.totales.iglesiasSuspendidas > 0 ? "negative" : "default"}
+              />
+              <StatTile label="Pastores" value={data.totales.pastores.toLocaleString("es-CL")} />
+              <StatTile
+                label="Certificados emitidos"
+                value={data.totales.certificadosEmitidos.toLocaleString("es-CL")}
+                helpText="Matrimonios, bautizos, defunciones y presentaciones"
+              />
             </div>
 
             <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <h2 className="text-sm font-medium text-foreground">Iglesias por región</h2>
+              <h2 className="text-sm font-medium text-foreground">Horas de mayor actividad</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Sesiones por hora (hora UTC).</p>
               <div className="mt-4">
-                {data.porRegion.length > 0 ? (
-                  <RegionBars data={data.porRegion} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">Todavía no hay iglesias registradas.</p>
-                )}
+                <VerticalBars
+                  data={data.actividad.porHora.map((p) => ({ label: formatHoraUTC(p.hora), value: p.sesiones }))}
+                  colorClass="bg-chart-accent"
+                  labelEvery={3}
+                  ariaLabel="Sesiones por hora del día, en hora UTC"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="text-sm font-medium text-foreground">Certificados por tipo</h2>
+                <div className="mt-4">
+                  <HorizontalBars
+                    data={(Object.keys(CERTIFICADOS_LABEL) as (keyof typeof CERTIFICADOS_LABEL)[]).map((tipo) => ({
+                      label: CERTIFICADOS_LABEL[tipo],
+                      value: data.certificados.porTipo[tipo],
+                    }))}
+                  />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="text-sm font-medium text-foreground">Certificados por mes</h2>
+                <div className="mt-4">
+                  <VerticalBars
+                    data={data.certificados.porMes.map((p) => ({ label: formatMesCorto(p.mes), value: p.cantidad }))}
+                    ariaLabel="Certificados emitidos por mes, últimos 6 meses"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="text-sm font-medium text-foreground">Iglesias por región</h2>
+                <div className="mt-4">
+                  <HorizontalBars
+                    data={data.porRegion.map((r) => ({ label: r.region, value: r.cantidad }))}
+                    emptyMessage="Todavía no hay iglesias registradas."
+                  />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="text-sm font-medium text-foreground">Iglesias por plan</h2>
+                <div className="mt-4">
+                  <HorizontalBars data={data.porPlan.map((p) => ({ label: PLAN_LABEL[p.plan], value: p.cantidad }))} />
+                </div>
               </div>
             </div>
 
             <div className="mt-6 rounded-2xl border border-border bg-card shadow-sm">
-              <div className="p-6 pb-0">
-                <h2 className="text-sm font-medium text-foreground">Iglesias</h2>
+              <div className="flex items-center justify-between gap-4 p-6 pb-4">
+                <h2 className="text-sm font-medium text-foreground">Iglesias recientes</h2>
+                <Link
+                  href="/superadmin/iglesias"
+                  className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  Ver todas
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
-              {data.iglesias.length === 0 ? (
+              {data.iglesiasRecientes.length === 0 ? (
                 <p className="p-10 text-center text-sm text-muted-foreground">Aún no hay iglesias creadas.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Iglesia</TableHead>
-                      <TableHead>Ubicación</TableHead>
-                      <TableHead>Pastor</TableHead>
-                      <TableHead>Creada</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.iglesias.map((iglesia) => (
-                      <TableRow
-                        key={iglesia.id}
-                        className="cursor-pointer"
-                        onClick={() => router.push(`/superadmin/iglesias/${iglesia.id}`)}
-                      >
-                        <TableCell className="font-medium text-foreground">
-                          <div className="flex items-center gap-3">
-                            <IglesiaLogo logoUrl={iglesia.logoUrl} nombre={iglesia.nombre} />
-                            {iglesia.nombre}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
+                <div className="divide-y divide-border border-t border-border">
+                  {data.iglesiasRecientes.map((iglesia) => (
+                    <Link
+                      key={iglesia.id}
+                      href={`/superadmin/iglesias/${iglesia.id}`}
+                      className="flex items-center gap-3 px-6 py-3 transition-colors hover:bg-accent/40"
+                    >
+                      <IglesiaLogo logoUrl={iglesia.logoUrl} nombre={iglesia.nombre} size={32} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{iglesia.nombre}</p>
+                        <p className="truncate text-xs text-muted-foreground">
                           {iglesia.comuna}, {iglesia.region}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {iglesia.pastor ? `${iglesia.pastor.nombre} ${iglesia.pastor.apellido}` : "Sin asignar"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(iglesia.createdAt).toLocaleDateString("es-CL")}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`rounded-full px-2 py-1 text-xs font-medium ${PLAN_BADGE_CLASSES[iglesia.plan]}`}>
-                            {PLAN_LABEL[iglesia.plan]}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={
-                              iglesia.estado === "ACTIVA"
-                                ? "rounded-full bg-accent px-2 py-1 text-xs font-medium text-primary"
-                                : "rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
-                            }
-                          >
-                            {ESTADO_LABEL[iglesia.estado]}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE_CLASSES[iglesia.plan]}`}
+                      >
+                        {PLAN_LABEL[iglesia.plan]}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               )}
             </div>
           </>

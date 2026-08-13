@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSocket } from "@/hooks/use-socket";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { AsistenciasDialog } from "./asistencias-dialog";
@@ -20,6 +21,8 @@ import {
   ESTADO_PREDICADOR_LABEL,
   TIPO_EVENTO_LABEL,
   type Evento,
+  type Predicador,
+  type PredicadorRespondioPayload,
   type TipoEvento,
 } from "./types";
 
@@ -113,6 +116,7 @@ export function EventoDialog({
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [asistenciasOpen, setAsistenciasOpen] = useState(false);
+  const [predicadores, setPredicadores] = useState<Predicador[]>([]);
 
   const form = useForm<EventoValues>({
     resolver: zodResolver(eventoSchema),
@@ -138,6 +142,7 @@ export function EventoDialog({
     setPredicadoresNuevos([]);
     setNuevoEmail("");
     setNuevoNombre("");
+    setPredicadores(evento?.predicadores ?? []);
 
     if (evento) {
       const inicio = new Date(evento.fechaInicio);
@@ -166,6 +171,30 @@ export function EventoDialog({
       });
     }
   }, [open, evento, defaultDate, form]);
+
+  const socket = useSocket();
+
+  // Realtime (ver frontend/prompt.md): el predicador respondió desde el link
+  // del email — actualiza el badge sin recargar, solo si el evento que
+  // responde es el que está abierto en este diálogo.
+  useEffect(() => {
+    if (!socket || !open || !esEdicion || !evento) return;
+    const eventoId = evento.id;
+
+    function onPredicadorRespondio(payload: PredicadorRespondioPayload) {
+      if (payload.eventoId !== eventoId) return;
+      setPredicadores((prev) =>
+        prev.map((p) =>
+          p.id === payload.predicadorId ? { ...p, estado: payload.estado, respondidoAt: payload.respondidoAt } : p,
+        ),
+      );
+    }
+
+    socket.on("predicador:respondio", onPredicadorRespondio);
+    return () => {
+      socket.off("predicador:respondio", onPredicadorRespondio);
+    };
+  }, [socket, open, esEdicion, evento]);
 
   const tipoSeleccionado = form.watch("tipo");
 
@@ -458,9 +487,9 @@ export function EventoDialog({
                 <p className="text-sm font-medium text-foreground">Predicadores</p>
 
                 {esEdicion ? (
-                  evento && evento.predicadores.length > 0 ? (
+                  predicadores.length > 0 ? (
                     <div className="space-y-2">
-                      {evento.predicadores.map((p) => (
+                      {predicadores.map((p) => (
                         <div
                           key={p.id}
                           className="flex items-center justify-between rounded-lg border border-border bg-muted px-3 py-2 text-sm"

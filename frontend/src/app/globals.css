@@ -29,6 +29,12 @@
     --input: 210 30% 89%;
     --ring: 199 84% 62%;
 
+    /* Acento reservado exclusivamente para visualizaciones de tiempo/actividad
+     * (heartbeat, sesiones, minutos de uso) en los dashboards — un canal de
+     * dato = un color, consistente entre SuperAdmin y Manager/Usuario, para no
+     * mezclarlo con el azul de marca que ya tiene otro significado (nav/identidad). */
+    --chart-accent: 16 75% 58%;
+
     --radius: 0.75rem;
   }
 }

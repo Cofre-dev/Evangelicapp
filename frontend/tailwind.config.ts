@@ -44,6 +44,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "chart-accent": "hsl(var(--chart-accent))",
       },
       borderRadius: {
         lg: "var(--radius)",
