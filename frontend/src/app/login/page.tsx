@@ -15,7 +15,7 @@ import { ApiError, apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type SessionUser } from "@/stores/auth-store";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Ingresa tu usuario"),
+  email: z.string().min(1, "Ingresa tu correo electrónico").email("Ingresa un correo válido"),
   password: z.string().min(1, "Ingresa tu contraseña"),
 });
 
@@ -50,7 +50,7 @@ export default function LoginPage() {
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   if (hasHydrated && usuarioActual) {
@@ -133,12 +133,12 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="mt-8 space-y-4">
               <FormField
                 control={form.control}
-                name="username"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Usuario</FormLabel>
+                    <FormLabel>Correo electrónico</FormLabel>
                     <FormControl>
-                      <Input autoComplete="username" placeholder="jperez" {...field} />
+                      <Input type="email" autoComplete="email" placeholder="pastor@demo.cl" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

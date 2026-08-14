@@ -6,6 +6,22 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-08-14 — Login por email en vez de username (Fase 7 de docs/supabase.md, primer paso)
+
+**Por qué**: brief del backend en `frontend/prompt.md` — primer paso (breaking change puntual) hacia reemplazar el login propio por Supabase Auth. `POST /auth/login` pasó a exigir `email` (validado `@IsEmail()` en el backend) en vez de `username`; si el frontend seguía mandando `username`, el login fallaba con `401` indistinguible de "credenciales inválidas". Todo lo demás del flujo (cookies httpOnly, `csrfToken`/`usuario`/`requiresPasswordChange`/`requiresOnboarding` en la respuesta, `POST /auth/refresh`, `POST /auth/logout`, CSRF) no cambia — sigue siendo la API propia, sin `supabase-js` todavía.
+
+**Qué se implementó**:
+- **`src/app/login/page.tsx`**: el campo del formulario pasó de `username` (`z.string().min(1, ...)`) a `email` (`z.string().min(1, ...).email(...)`, mismo criterio de validación por email ya usado en otros formularios del repo). Input: label "Correo electrónico", `type="email"`, `autoComplete="email"`, placeholder `pastor@demo.cl` (antes "Usuario"/`jperez`/`autoComplete="username"`). El body de `POST /auth/login` serializa `values` tal cual (sin cambios en `onSubmit`), así que basta con que el objeto tenga la key `email` en vez de `username` para que el request quede correcto.
+- Grep de `username` sobre `src/app/login/` para confirmar que no quedaba ninguna otra referencia al campo viejo — no hay otra pantalla que arme el body de login.
+
+**Qué NO se tocó (fuera de alcance, confirmado por el brief)**: `username` sigue existiendo como campo de perfil (`GET /auth/me`, gestión de equipo) — no es la credencial de login, nada más; recuperación/cambio de contraseña e invitación de equipo (ya eran por email); ningún `supabase-js` ni manejo de tokens/cookies de Supabase en el cliente (pasos siguientes de la Fase 7, todavía pausados según el propio brief).
+
+**Verificación**: `npm run lint` y `npx tsc --noEmit` pasan limpios. **No se corrió contra un backend real** (misma limitación que el resto de esta bitácora) — falta el smoke test obvio: loguearse con email/password reales y confirmar que ya no se manda `username`, y que un intento con el campo vacío o un email inválido muestra el mensaje de validación correcto antes de llegar al backend.
+
+`frontend/prompt.md` se vació — brief completamente consumido (mismo criterio que el resto de esta bitácora).
+
+---
+
 ## 2026-08-13 — Realtime (Fase 5 de docs/supabase.md): WebSocket para dashboard SuperAdmin, evento del Pastor y censo QR
 
 **Por qué**: brief del backend en `frontend/prompt.md`. El backend implementó un gateway de Socket.IO propio (no Supabase Realtime nativo — el doc original lo planteaba así, pero el backend descartó esa vía porque expondría eventos/integrantes de cualquier iglesia a cualquier cliente con la anon key mientras no exista RLS, Fase 8 todavía no implementada), autenticado con la misma cookie httpOnly `access_token` que ya usa el resto de la API. Tres pantallas ganan actualizaciones en vivo sin refrescar: el dashboard de SuperAdmin, el detalle de un evento (badges de predicadores) y la pantalla de censo/QR.
