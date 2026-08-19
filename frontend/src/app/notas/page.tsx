@@ -2,7 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Archive, CheckCircle2, Circle, Clock, Eye, EyeOff, Loader2, NotebookPen, Plus, X } from "lucide-react";
+import {
+  Archive,
+  CalendarDays,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Eye,
+  EyeOff,
+  Loader2,
+  NotebookPen,
+  Plus,
+  X,
+} from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,13 +27,29 @@ function formatoFechaLimite(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
 }
 
+function formatoFechaCorta(iso: string): string {
+  return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
+}
+
 function estaVencida(iso: string): boolean {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   return new Date(iso) < hoy;
 }
 
-function RecordatorioRow({
+/** Avatar de iniciales — `Nota.asignadoA`/`creadoPor` no traen foto (a
+ * diferencia de `equipo`, ver `components/notas/types.ts`), así que en vez de
+ * inventar un campo que el backend no manda, se resuelve siempre con iniciales. */
+function Iniciales({ nombre, apellido }: { nombre: string; apellido: string }) {
+  const iniciales = `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
+  return (
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
+      {iniciales}
+    </span>
+  );
+}
+
+function TareaCard({
   nota,
   onToggle,
   onAprobar,
@@ -39,64 +67,64 @@ function RecordatorioRow({
   const vencida = nota.estado === "PENDIENTE" && nota.fechaLimite !== null && estaVencida(nota.fechaLimite);
 
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/40">
-      {nota.estado === "EN_REVISION" ? (
-        <div className="mt-0.5 shrink-0 text-amber-500" title="Esperando tu aprobación">
-          <Clock className="h-5 w-5" />
-        </div>
-      ) : (
-        <button
-          type="button"
-          aria-label={nota.estado === "COMPLETADA" ? "Marcar como pendiente" : "Marcar como completada"}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(nota);
-          }}
-          disabled={procesando}
-          className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
-        >
-          {procesando ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : nota.estado === "COMPLETADA" ? (
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-          ) : (
-            <Circle className="h-5 w-5" />
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        {nota.estado === "EN_REVISION" ? (
+          <div className="mt-0.5 shrink-0 text-amber-500" title="Esperando tu aprobación">
+            <Clock className="h-5 w-5" />
+          </div>
+        ) : (
+          <button
+            type="button"
+            aria-label={nota.estado === "COMPLETADA" ? "Marcar como pendiente" : "Marcar como completada"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(nota);
+            }}
+            disabled={procesando}
+            className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+          >
+            {procesando ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : nota.estado === "COMPLETADA" ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <Circle className="h-5 w-5" />
+            )}
+          </button>
+        )}
+
+        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onEdit(nota)}>
+          <p
+            className={
+              nota.estado === "COMPLETADA"
+                ? "break-words text-sm font-semibold text-muted-foreground line-through"
+                : "break-words text-sm font-semibold text-foreground"
+            }
+          >
+            {nota.titulo}
+          </p>
+          {nota.descripcion && (
+            <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">{nota.descripcion}</p>
           )}
         </button>
-      )}
+      </div>
 
-      <button type="button" className="flex-1 text-left" onClick={() => onEdit(nota)}>
-        <p
-          className={
-            nota.estado === "COMPLETADA"
-              ? "text-sm font-medium text-muted-foreground line-through"
-              : "text-sm font-medium text-foreground"
-          }
-        >
-          {nota.titulo}
-        </p>
-        {nota.descripcion && <p className="mt-0.5 text-sm text-muted-foreground">{nota.descripcion}</p>}
-
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {nota.estado === "EN_REVISION" && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-              Marcada como hecha, esperando tu aprobación
-            </span>
+      {(nota.fechaLimite || nota.asignadoA || vencida || nota.archivado) && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 pl-8">
+          {vencida && (
+            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Venció</span>
           )}
           {nota.fechaLimite && (
-            <span
-              className={
-                vencida
-                  ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
-                  : "rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-              }
-            >
-              {vencida ? "Venció" : "Vence"} el {formatoFechaLimite(nota.fechaLimite)}
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              <CalendarDays className="h-3 w-3" />
+              {formatoFechaLimite(nota.fechaLimite)}
             </span>
           )}
           {nota.asignadoA && (
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-              {nota.asignadoA.nombre} {nota.asignadoA.apellido}
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+              <Iniciales nombre={nota.asignadoA.nombre} apellido={nota.asignadoA.apellido} />
+              {nota.asignadoA.nombre}
             </span>
           )}
           {nota.archivado && (
@@ -106,12 +134,13 @@ function RecordatorioRow({
             </span>
           )}
         </div>
-      </button>
+      )}
 
       {nota.estado === "EN_REVISION" && (
-        <div className="flex shrink-0 gap-1">
+        <div className="mt-3 flex justify-end gap-1.5 pl-8">
           <Button size="sm" variant="outline" onClick={() => onRechazar(nota)} disabled={procesando}>
             <X className="h-3.5 w-3.5" />
+            Rechazar
           </Button>
           <Button size="sm" onClick={() => onAprobar(nota)} disabled={procesando}>
             {procesando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -123,18 +152,94 @@ function RecordatorioRow({
   );
 }
 
-function NotaLargaRow({ nota, onEdit }: { nota: Nota; onEdit: (nota: Nota) => void }) {
+interface ColumnaProps {
+  titulo: string;
+  dotClassName: string;
+  notas: Nota[];
+  emptyLabel: string;
+  onCrear?: () => void;
+  onToggle: (nota: Nota) => void;
+  onAprobar: (nota: Nota) => void;
+  onRechazar: (nota: Nota) => void;
+  onEdit: (nota: Nota) => void;
+  procesandoId: string | null;
+}
+
+function Columna({ titulo, dotClassName, notas, emptyLabel, onCrear, onToggle, onAprobar, onRechazar, onEdit, procesandoId }: ColumnaProps) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border/60 bg-muted/30 p-3">
+      <div className="flex items-center gap-2 px-1">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${dotClassName}`} />
+        <h2 className="text-sm font-semibold text-foreground">{titulo}</h2>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          {notas.length}
+        </span>
+      </div>
+
+      {onCrear && (
+        <button
+          type="button"
+          onClick={onCrear}
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Nueva tarea
+        </button>
+      )}
+
+      {notas.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {notas.map((nota) => (
+            <TareaCard
+              key={nota.id}
+              nota={nota}
+              onToggle={onToggle}
+              onAprobar={onAprobar}
+              onRechazar={onRechazar}
+              onEdit={onEdit}
+              procesando={procesandoId === nota.id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotaCard({ nota, onEdit }: { nota: Nota; onEdit: (nota: Nota) => void }) {
   return (
     <button
       type="button"
       onClick={() => onEdit(nota)}
-      className="flex w-full items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/40"
+      className="flex h-full min-w-0 flex-col items-start gap-3 rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
-      <NotebookPen className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-      <div>
-        <p className="text-sm font-medium text-foreground">{nota.titulo}</p>
-        {nota.descripcion && <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{nota.descripcion}</p>}
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
+        <NotebookPen className="h-3 w-3" />
+        Nota
+      </span>
+
+      <div className="min-w-0">
+        <p className="break-words text-sm font-semibold text-foreground">{nota.titulo}</p>
+        {nota.descripcion && (
+          <p className="mt-1.5 line-clamp-3 whitespace-pre-line break-words text-sm text-muted-foreground">
+            {nota.descripcion}
+          </p>
+        )}
       </div>
+
+      {nota.creadoPor && (
+        <div className="mt-auto flex w-full items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-2">
+            <Iniciales nombre={nota.creadoPor.nombre} apellido={nota.creadoPor.apellido} />
+            <span className="truncate">
+              {nota.creadoPor.nombre} {nota.creadoPor.apellido}
+            </span>
+          </div>
+          <span className="shrink-0">{formatoFechaCorta(nota.createdAt)}</span>
+        </div>
+      )}
     </button>
   );
 }
@@ -185,6 +290,21 @@ export default function NotasPage() {
     setDialogOpen(true);
   }
 
+  function abrirEdicionNota(nota: Nota) {
+    if (!window.confirm("¿Quieres editar esta nota?")) return;
+    abrirEdicion(nota);
+  }
+
+  /** Una tarea completada abre directo en modo solo-lectura (la candada
+   * `NotaDialog`, ver `soloLectura` ahí) — no tiene sentido pedir
+   * confirmación para "editar" algo que no se va a poder cambiar. Para el
+   * resto (pendiente/en revisión) sí se pide autorización antes de abrir,
+   * mismo criterio que ya existía para notas largas en `abrirEdicionNota`. */
+  function abrirEdicionTarea(nota: Nota) {
+    if (nota.estado !== "COMPLETADA" && !window.confirm("¿Quieres editar esta tarea?")) return;
+    abrirEdicion(nota);
+  }
+
   async function actualizarEstado(nota: Nota, estado: "PENDIENTE" | "COMPLETADA") {
     if (!usuario) return;
     setProcesandoId(nota.id);
@@ -224,16 +344,17 @@ export default function NotasPage() {
   const recordatorios = notas.filter((n) => n.tipo === "RECORDATORIO");
   const notasLargas = notas.filter((n) => n.tipo === "NOTA" && !n.archivado);
 
-  const pendientes = recordatorios.filter((n) => !n.archivado && (n.estado === "PENDIENTE" || n.estado === "EN_REVISION"));
+  const pendientes = recordatorios.filter((n) => !n.archivado && n.estado === "PENDIENTE");
+  const enRevision = recordatorios.filter((n) => !n.archivado && n.estado === "EN_REVISION");
   const completadas = recordatorios.filter((n) => !n.archivado && n.estado === "COMPLETADA");
   const archivados = recordatorios.filter((n) => n.archivado);
 
   return (
-    <main className="h-full bg-background p-8">
-      <div className="mx-auto max-w-3xl">
+    <main className="h-full bg-background p-4 sm:p-8">
+      <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Notas de recordatorio</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Notas</h1>
             <p className="mt-1 text-sm text-muted-foreground">Uso exclusivo del pastor.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -264,78 +385,67 @@ export default function NotasPage() {
             Cargando...
           </div>
         ) : (
-          <div className="mt-6 space-y-8">
-            <div className="space-y-3">
-              <h2 className="text-sm font-medium text-muted-foreground">Pendientes ({pendientes.length})</h2>
-              {pendientes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tienes pendientes. ¡Vas al día!</p>
-              ) : (
-                <div className="space-y-2">
-                  {pendientes.map((nota) => (
-                    <RecordatorioRow
-                      key={nota.id}
-                      nota={nota}
-                      onToggle={toggleEstado}
-                      onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
-                      onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
-                      onEdit={abrirEdicion}
-                      procesando={procesandoId === nota.id}
-                    />
-                  ))}
-                </div>
+          <div className="mt-6 space-y-10">
+            <div
+              className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${verArchivados ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
+            >
+              <Columna
+                titulo="Pendientes"
+                dotClassName="bg-amber-400"
+                notas={pendientes}
+                emptyLabel="No tienes pendientes. ¡Vas al día!"
+                onCrear={() => abrirCreacion("RECORDATORIO")}
+                onToggle={toggleEstado}
+                onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
+                onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
+                onEdit={abrirEdicionTarea}
+                procesandoId={procesandoId}
+              />
+              <Columna
+                titulo="En revisión"
+                dotClassName="bg-sky-400"
+                notas={enRevision}
+                emptyLabel="Nada esperando tu aprobación."
+                onToggle={toggleEstado}
+                onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
+                onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
+                onEdit={abrirEdicionTarea}
+                procesandoId={procesandoId}
+              />
+              <Columna
+                titulo="Completadas"
+                dotClassName="bg-emerald-500"
+                notas={completadas}
+                emptyLabel="Todavía no hay recordatorios completados."
+                onToggle={toggleEstado}
+                onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
+                onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
+                onEdit={abrirEdicionTarea}
+                procesandoId={procesandoId}
+              />
+              {verArchivados && (
+                <Columna
+                  titulo="Archivados"
+                  dotClassName="bg-slate-400"
+                  notas={archivados}
+                  emptyLabel="No hay recordatorios archivados."
+                  onToggle={toggleEstado}
+                  onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
+                  onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
+                  onEdit={abrirEdicionTarea}
+                  procesandoId={procesandoId}
+                />
               )}
             </div>
-
-            {completadas.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-sm font-medium text-muted-foreground">Completados ({completadas.length})</h2>
-                <div className="space-y-2">
-                  {completadas.map((nota) => (
-                    <RecordatorioRow
-                      key={nota.id}
-                      nota={nota}
-                      onToggle={toggleEstado}
-                      onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
-                      onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
-                      onEdit={abrirEdicion}
-                      procesando={procesandoId === nota.id}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {verArchivados && (
-              <div className="space-y-3">
-                <h2 className="text-sm font-medium text-muted-foreground">Archivados ({archivados.length})</h2>
-                {archivados.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay recordatorios archivados.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {archivados.map((nota) => (
-                      <RecordatorioRow
-                        key={nota.id}
-                        nota={nota}
-                        onToggle={toggleEstado}
-                        onAprobar={(n) => actualizarEstado(n, "COMPLETADA")}
-                        onRechazar={(n) => actualizarEstado(n, "PENDIENTE")}
-                        onEdit={abrirEdicion}
-                        procesando={procesandoId === nota.id}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             <div className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground">Notas ({notasLargas.length})</h2>
               {notasLargas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Todavía no hay notas largas.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {notasLargas.map((nota) => (
-                    <NotaLargaRow key={nota.id} nota={nota} onEdit={abrirEdicion} />
+                    <NotaCard key={nota.id} nota={nota} onEdit={abrirEdicionNota} />
                   ))}
                 </div>
               )}

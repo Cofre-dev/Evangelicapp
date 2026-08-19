@@ -16,18 +16,28 @@ interface DepartamentoSelectorProps {
   departamentosActivos: Departamento[];
   contexto: ContextoFinanzas;
   esManager: boolean;
+  /** Ruta sobre la que navega al cambiar de contexto — permite reusar el
+   * selector en cualquier sub-página de Finanzas (ej. `/finanzas/analitica`)
+   * sin que el cambio de departamento te saque de ahí. Default `/finanzas`
+   * preserva el comportamiento original. */
+  basePath?: string;
 }
 
-export function DepartamentoSelector({ departamentosActivos, contexto, esManager }: DepartamentoSelectorProps) {
+export function DepartamentoSelector({
+  departamentosActivos,
+  contexto,
+  esManager,
+  basePath = "/finanzas",
+}: DepartamentoSelectorProps) {
   const router = useRouter();
 
   const value = contexto.tipo === "general" ? VALOR_GENERAL : contexto.id;
 
   function onValueChange(nextValue: string) {
     if (nextValue === VALOR_GENERAL) {
-      router.push("/finanzas");
+      router.push(basePath);
     } else {
-      router.push(`/finanzas?departamentoId=${nextValue}`);
+      router.push(`${basePath}?departamentoId=${nextValue}`);
     }
   }
 

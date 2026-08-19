@@ -21,9 +21,14 @@ interface MonthCalendarProps {
   eventos: Evento[];
   onDayClick: (date: Date) => void;
   onEventoClick: (evento: Evento) => void;
+  /** Click en el número del día (no en el resto de la celda) — navega al
+   * detalle de ese día, mismo comportamiento que Google Calendar: clickear el
+   * número te lleva a la vista Día, clickear el resto de la celda crea un
+   * evento ahí (`onDayClick`, sin tocar). */
+  onDayNumberClick: (date: Date) => void;
 }
 
-export function MonthCalendar({ mes, eventos, onDayClick, onEventoClick }: MonthCalendarProps) {
+export function MonthCalendar({ mes, eventos, onDayClick, onEventoClick, onDayNumberClick }: MonthCalendarProps) {
   const dias = buildMonthGrid(mes.getFullYear(), mes.getMonth());
   const hoy = new Date();
 
@@ -55,15 +60,21 @@ export function MonthCalendar({ mes, eventos, onDayClick, onEventoClick }: Month
                 enMesActual ? "" : "bg-muted/30",
               ].join(" ")}
             >
-              <span
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDayNumberClick(dia);
+                }}
+                aria-label={`Ver el día ${dia.getDate()}`}
                 className={
                   esHoy
                     ? "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-                    : `text-xs font-medium ${enMesActual ? "text-foreground" : "text-muted-foreground"}`
+                    : `w-fit text-xs font-medium hover:underline ${enMesActual ? "text-foreground" : "text-muted-foreground"}`
                 }
               >
                 {dia.getDate()}
-              </span>
+              </button>
 
               <div className="flex flex-col gap-1">
                 {eventosDelDia.slice(0, 3).map((evento) => (

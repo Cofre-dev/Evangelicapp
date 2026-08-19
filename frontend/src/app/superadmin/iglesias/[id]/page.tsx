@@ -1,62 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Building2, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HorizontalBars } from "@/components/dashboard/horizontal-bars";
+import { StatTile } from "@/components/dashboard/stat-tile";
+import { VerticalBars } from "@/components/dashboard/vertical-bars";
+import { formatMesCorto } from "@/components/dashboard/format";
+import { CambiarFacturacionDialog } from "@/components/iglesias/cambiar-facturacion-dialog";
+import { HistorialPagosCard } from "@/components/iglesias/historial-pagos-card";
+import { IglesiaLogo } from "@/components/iglesias/iglesia-logo";
 import {
   FACTURACION_COLOR_CLASSES,
   PLAN_BADGE_CLASSES,
   PLAN_LABEL,
-  type EstadoFacturacion,
-  type LimitesIglesia,
+  type IglesiaDetalle,
+  type MiembroEquipo,
   type PlanIglesia,
 } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
 
-interface MiembroEquipo {
-  id: string;
-  username: string;
-  email: string;
-  nombre: string;
-  apellido: string;
-  rol: "USUARIO";
-  activo: boolean;
-  createdAt: string;
-}
-
-interface IglesiaDetalle {
-  id: string;
-  nombre: string;
-  comuna: string;
-  region: string;
-  direccion: string | null;
-  logoUrl: string | null;
-  estado: "ACTIVA" | "SUSPENDIDA" | "INACTIVA";
-  visitantesPromedio: number | null;
-  createdAt: string;
-  ultimoPagoAt: string | null;
-  plan: PlanIglesia;
-  facturacion: EstadoFacturacion;
-  limites: LimitesIglesia;
-  // Este endpoint (`/iglesias/:id`, exclusivo de SUPER_ADMIN) no está
-  // mencionado explícitamente en el brief de `frontend/prompt.md`. Se deja el
-  // nombre del campo (`pastor`) sin tocar por no tener confirmación de que
-  // haya cambiado, pero el valor literal de `rol` sí se actualiza a `MANAGER`
-  // porque ese es un enum global del backend y "PASTOR" ya no existe en él —
-  // dejarlo en "PASTOR" garantizaría un mismatch de tipos contra la respuesta
-  // real. Señalado para confirmar con backend en vez de asumido en silencio.
-  pastor: (Omit<MiembroEquipo, "rol"> & { rol: "MANAGER" }) | null;
-  equipo: MiembroEquipo[];
-}
+const CERTIFICADOS_LABEL: Record<keyof IglesiaDetalle["estadisticas"]["certificados"]["porTipo"], string> = {
+  matrimonios: "Matrimonios",
+  bautizos: "Bautizos",
+  defunciones: "Defunciones",
+  presentaciones: "Presentaciones",
+};
 
 const ROL_LABEL: Record<MiembroEquipo["rol"], string> = {
   USUARIO: "Usuario",
@@ -94,6 +71,7 @@ export default function IglesiaDetallePage() {
   const [fechaFacturacion, setFechaFacturacion] = useState("");
   const [accionEnCurso, setAccionEnCurso] = useState<string | null>(null);
   const [accionError, setAccionError] = useState<string | null>(null);
+  const [confirmFacturacionOpen, setConfirmFacturacionOpen] = useState(false);
 
   useEffect(() => {
     if (!usuario || !params.id) return;
@@ -132,14 +110,6 @@ export default function IglesiaDetallePage() {
     ejecutarAccion("plan", "/plan", { method: "PATCH", body: JSON.stringify({ plan: planSeleccionado }) });
   }
 
-  function guardarFechaFacturacion() {
-    if (!fechaFacturacion) return;
-    ejecutarAccion("fecha", "/facturacion", {
-      method: "PATCH",
-      body: JSON.stringify({ proximaFacturacion: fechaFacturacion }),
-    });
-  }
-
   function marcarPagada() {
     ejecutarAccion("pagada", "/marcar-pagada", { method: "POST" });
   }
@@ -171,11 +141,11 @@ export default function IglesiaDetallePage() {
     <main className="h-full bg-background p-8">
       <div className="mx-auto max-w-3xl">
         <Link
-          href="/superadmin"
+          href="/superadmin/iglesias"
           className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Volver al dashboard
+          Volver a Iglesias
         </Link>
 
         {error && (
@@ -193,19 +163,7 @@ export default function IglesiaDetallePage() {
           <>
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
               <div className="flex items-start gap-4">
-                {data.logoUrl ? (
-                  <Image
-                    src={data.logoUrl}
-                    alt={`Logo de ${data.nombre}`}
-                    width={56}
-                    height={56}
-                    className="h-14 w-14 shrink-0 rounded-full border border-border object-contain"
-                  />
-                ) : (
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-accent text-primary">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                )}
+                <IglesiaLogo logoUrl={data.logoUrl} nombre={data.nombre} size={56} />
 
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -238,6 +196,68 @@ export default function IglesiaDetallePage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Visitantes promedio</p>
                   <p className="text-foreground">{data.visitantesPromedio ?? "—"}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ⚠️ Nada financiero acá — el SuperAdmin no ve el detalle
+                financiero/operativo interno de una iglesia (regla de negocio
+                explícita, ver frontend/prompt.md sección 5). Esta sección solo
+                pinta `data.estadisticas`, que el backend garantiza sin montos
+                ni movimientos. La card de "Facturación" de abajo es el cobro
+                de la plataforma a la iglesia (nivel Evangelicapp), no lo
+                mismo que el manejo interno de plata de la propia iglesia —
+                separada físicamente de esta sección a propósito para que la
+                regla se sostenga por construcción. */}
+            <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+              <h2 className="text-sm font-medium text-foreground">Estadísticas</h2>
+              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <StatTile label="Activos hoy" value={data.estadisticas.usuariosActivosHoy.toLocaleString("es-CL")} />
+                <StatTile
+                  label="Activos esta semana"
+                  value={data.estadisticas.usuariosActivosSemana.toLocaleString("es-CL")}
+                />
+                <StatTile label="Integrantes" value={data.estadisticas.integrantesTotal.toLocaleString("es-CL")} />
+                <StatTile label="Notas pendientes" value={data.estadisticas.notasPendientes.toLocaleString("es-CL")} />
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Eventos de agenda</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {data.estadisticas.eventos.total.toLocaleString("es-CL")} en total ·{" "}
+                    {data.estadisticas.eventos.proximos30d.toLocaleString("es-CL")} en los próximos 30 días
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Certificados emitidos</p>
+                  <p className="mt-1 text-sm text-foreground">{data.estadisticas.certificados.total.toLocaleString("es-CL")} en total</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Certificados por tipo</p>
+                  <div className="mt-3">
+                    <HorizontalBars
+                      data={(Object.keys(CERTIFICADOS_LABEL) as (keyof typeof CERTIFICADOS_LABEL)[]).map((tipo) => ({
+                        label: CERTIFICADOS_LABEL[tipo],
+                        value: data.estadisticas.certificados.porTipo[tipo],
+                      }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Certificados por mes</p>
+                  <div className="mt-3">
+                    <VerticalBars
+                      data={data.estadisticas.certificados.porMes.map((p) => ({
+                        label: formatMesCorto(p.mes),
+                        value: p.cantidad,
+                      }))}
+                      ariaLabel="Certificados emitidos por mes, últimos 6 meses"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -312,10 +332,10 @@ export default function IglesiaDetallePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={guardarFechaFacturacion}
+                      onClick={() => setConfirmFacturacionOpen(true)}
                       disabled={accionEnCurso !== null || !fechaFacturacion}
                     >
-                      {accionEnCurso === "fecha" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+                      Guardar
                     </Button>
                   </div>
                 </div>
@@ -360,6 +380,8 @@ export default function IglesiaDetallePage() {
               </div>
             </div>
 
+            <HistorialPagosCard iglesiaId={data.id} />
+
             <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
               <h2 className="text-sm font-medium text-foreground">Pastor a cargo</h2>
               <div className="mt-3">
@@ -394,6 +416,15 @@ export default function IglesiaDetallePage() {
                 )}
               </div>
             </div>
+
+            <CambiarFacturacionDialog
+              iglesiaId={data.id}
+              iglesiaNombre={data.nombre}
+              nuevaFecha={fechaFacturacion}
+              open={confirmFacturacionOpen}
+              onOpenChange={setConfirmFacturacionOpen}
+              onActualizado={setData}
+            />
           </>
         ) : null}
       </div>

@@ -12,11 +12,19 @@ export function HorizontalBars({
   colorClass = "bg-primary",
   valueFormatter = (v: number) => v.toLocaleString("es-CL"),
   emptyMessage = "Sin datos por ahora.",
+  /** `w-16` alcanza para contadores cortos ("162"), pero se queda corto con
+   * montos formateados en pesos ("$1.234.567") — sobreescribible por quien
+   * llama en vez de agrandar el default y afectar a todos los usos actuales
+   * (todos con contadores). Clase estática a propósito (no template
+   * dinámico): Tailwind necesita verla escrita literal en el código fuente
+   * de quien la pasa para no purgarla en build. */
+  valueWidthClass = "w-16",
 }: {
   data: { label: string; value: number }[];
   colorClass?: string;
   valueFormatter?: (value: number) => string;
   emptyMessage?: string;
+  valueWidthClass?: string;
 }) {
   if (data.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
@@ -37,7 +45,7 @@ export function HorizontalBars({
               style={{ width: `${Math.max((d.value / max) * 100, 4)}%` }}
             />
           </div>
-          <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-foreground">
+          <span className={`${valueWidthClass} shrink-0 text-right text-sm font-medium tabular-nums text-foreground`}>
             {valueFormatter(d.value)}
           </span>
         </div>

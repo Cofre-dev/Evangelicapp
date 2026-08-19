@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileClock, Loader2, Plus, Upload } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileClock, LineChart, Loader2, Plus, Upload } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -300,6 +300,12 @@ function FinanzasContent() {
         )}
 
         <div className="mt-6 flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href={contexto.tipo === "general" ? "/finanzas/analitica" : `/finanzas/analitica?departamentoId=${contexto.id}`}>
+              <LineChart className="h-4 w-4" />
+              Ver analítica
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => setLogsOpen(true)}>
             <FileClock className="h-4 w-4" />
             Logs

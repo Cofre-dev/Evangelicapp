@@ -35,7 +35,7 @@ const createIglesiaSchema = z.object({
   comuna: z.string().min(1, "Selecciona una comuna"),
   direccion: z.string().optional(),
   plan: z.enum(PLANES, { errorMap: () => ({ message: "Selecciona un plan" }) }),
-  proximaFacturacion: z.string().min(1, "Selecciona la fecha de facturación"),
+  fechaAdquisicionPlan: z.string().min(1, "Selecciona la fecha de adquisición del plan"),
   pastorUsername: z
     .string()
     .min(1, "Ingresa un usuario")
@@ -48,7 +48,7 @@ const createIglesiaSchema = z.object({
 type CreateIglesiaValues = z.infer<typeof createIglesiaSchema>;
 
 /** Campos que se validan antes de dejar avanzar del paso 1 (iglesia) al paso 2 (pastor). */
-const CAMPOS_PASO_IGLESIA = ["nombre", "region", "comuna", "plan", "proximaFacturacion"] as const;
+const CAMPOS_PASO_IGLESIA = ["nombre", "region", "comuna", "plan", "fechaAdquisicionPlan"] as const;
 
 interface IglesiaCreada {
   id: string;
@@ -71,6 +71,18 @@ type Step = "iglesia" | "pastor" | "result";
 
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
+/** El backend calcula la primera facturación como fechaAdquisicionPlan + 30
+ * días (ver frontend/prompt.md) — se replica acá solo para la preview en el
+ * formulario, el valor real siempre lo define el backend. */
+function calcularProximaFacturacion(fechaAdquisicionPlan: string): string | null {
+  const [year, month, day] = fechaAdquisicionPlan.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  const fecha = new Date(year, month - 1, day);
+  fecha.setDate(fecha.getDate() + 30);
+  return fecha.toLocaleDateString("es-CL");
+}
+
 export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
   const usuario = useAuthStore((state) => state.usuario);
 
@@ -90,7 +102,7 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
       comuna: "",
       direccion: "",
       plan: "BASICO",
-      proximaFacturacion: "",
+      fechaAdquisicionPlan: "",
       pastorUsername: "",
       pastorEmail: "",
       pastorNombre: "",
@@ -100,6 +112,8 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
 
   const regionSeleccionada = form.watch("region");
   const comunasDisponibles = REGIONES_CHILE.find((r) => r.region === regionSeleccionada)?.comunas ?? [];
+  const fechaAdquisicionPlan = form.watch("fechaAdquisicionPlan");
+  const proximaFacturacionPreview = fechaAdquisicionPlan ? calcularProximaFacturacion(fechaAdquisicionPlan) : null;
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -150,7 +164,7 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
     formData.append("comuna", values.comuna);
     if (values.direccion) formData.append("direccion", values.direccion);
     formData.append("plan", values.plan);
-    formData.append("proximaFacturacion", values.proximaFacturacion);
+    formData.append("fechaAdquisicionPlan", values.fechaAdquisicionPlan);
     formData.append("pastorUsername", values.pastorUsername);
     formData.append("pastorEmail", values.pastorEmail);
     formData.append("pastorNombre", values.pastorNombre);
@@ -353,13 +367,18 @@ export function CreateIglesiaDialog({ onCreated }: { onCreated: () => void }) {
 
                       <FormField
                         control={form.control}
-                        name="proximaFacturacion"
+                        name="fechaAdquisicionPlan"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Primera facturación</FormLabel>
+                            <FormLabel>Fecha de adquisición del plan</FormLabel>
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
+                            {proximaFacturacionPreview && (
+                              <p className="text-xs text-muted-foreground">
+                                Próxima facturación: {proximaFacturacionPreview}
+                              </p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}

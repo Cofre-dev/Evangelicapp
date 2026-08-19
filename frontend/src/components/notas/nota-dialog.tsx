@@ -95,7 +95,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
     : equipo;
 
   async function onSubmit(values: NotaValues) {
-    if (!usuario) return;
+    if (!usuario || soloLectura) return;
     setServerError(null);
 
     const body = {
@@ -128,6 +128,11 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
       onDeleted();
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "No se pudo eliminar la nota");
+    } finally {
+      // En `finally` (no solo en el catch): el diálogo sigue montado entre
+      // aperturas (solo se oculta, `open` es un prop), así que si esto
+      // quedaba en `true` tras un éxito, el botón de la SIGUIENTE nota que se
+      // abriera nacía deshabilitado hasta recargar la página.
       setDeleting(false);
     }
   }
@@ -142,6 +147,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
       onSaved();
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "No se pudo archivar el recordatorio");
+    } finally {
       setArchivando(false);
     }
   }
@@ -156,21 +162,30 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
       onSaved();
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "No se pudo desarchivar el recordatorio");
+    } finally {
       setArchivando(false);
     }
   }
 
   const esRecordatorio = tipo === "RECORDATORIO";
+  /** Una tarea completada ya cumplió su propósito: se puede archivar o
+   * eliminar, pero no editar (a pedido explícito del fundador). Las notas
+   * largas no tienen `estado` de flujo, así que nunca quedan de solo lectura. */
+  const soloLectura = Boolean(esEdicion && nota && esRecordatorio && nota.estado === "COMPLETADA");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="border-b border-border pb-4">
+          <DialogTitle className="text-xl">
             {esEdicion ? "Editar" : "Nuevo"} {esRecordatorio ? "recordatorio" : "nota"}
           </DialogTitle>
           <DialogDescription>
-            {esRecordatorio ? "Tarea corta con fecha límite, asignable a tu equipo." : "Nota larga de uso personal."}
+            {soloLectura
+              ? "Esta tarea ya fue completada y no se puede modificar. Puedes archivarla o eliminarla."
+              : esRecordatorio
+                ? "Tarea corta con fecha límite, asignable a tu equipo."
+                : "Nota larga de uso personal."}
           </DialogDescription>
         </DialogHeader>
 
@@ -194,7 +209,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                 <FormItem>
                   <FormLabel>Título</FormLabel>
                   <FormControl>
-                    <Input placeholder="Comprar elementos para la cena de confraternidad" {...field} />
+                    <Input placeholder="Comprar elementos para la cena de confraternidad" disabled={soloLectura} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -208,7 +223,11 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                 <FormItem>
                   <FormLabel>{esRecordatorio ? "Descripción (opcional)" : "Contenido"}</FormLabel>
                   <FormControl>
-                    {esRecordatorio ? <Input {...field} /> : <Textarea rows={8} {...field} />}
+                    {esRecordatorio ? (
+                      <Input disabled={soloLectura} {...field} />
+                    ) : (
+                      <Textarea rows={8} disabled={soloLectura} {...field} />
+                    )}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -224,7 +243,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                     <FormItem>
                       <FormLabel>Fecha límite (opcional)</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" disabled={soloLectura} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -237,7 +256,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Asignar a</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={soloLectura}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Sin asignar" />
@@ -259,7 +278,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
             )}
 
             {esEdicion && nota && esRecordatorio && (
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
                 {nota.archivado ? (
                   <Button type="button" variant="outline" size="sm" onClick={handleDesarchivar} disabled={archivando}>
                     {archivando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArchiveRestore className="h-4 w-4" />}
@@ -278,9 +297,7 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                       Archivar
                     </Button>
                     {nota.estado !== "COMPLETADA" && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Solo se pueden archivar recordatorios completados.
-                      </p>
+                      <p className="text-xs text-muted-foreground">Solo se pueden archivar recordatorios completados.</p>
                     )}
                   </>
                 )}
@@ -300,17 +317,19 @@ export function NotaDialog({ open, onOpenChange, nota, defaultTipo = "RECORDATOR
                   Eliminar
                 </Button>
               )}
-              <Button type="submit" className="flex-1" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : esEdicion ? (
-                  "Guardar cambios"
-                ) : esRecordatorio ? (
-                  "Crear recordatorio"
-                ) : (
-                  "Guardar nota"
-                )}
-              </Button>
+              {!soloLectura && (
+                <Button type="submit" className="flex-1" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : esEdicion ? (
+                    "Guardar cambios"
+                  ) : esRecordatorio ? (
+                    "Crear recordatorio"
+                  ) : (
+                    "Guardar nota"
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>
