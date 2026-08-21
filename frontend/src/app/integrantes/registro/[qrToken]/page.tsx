@@ -10,9 +10,15 @@ import { z } from "zod";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ApiError, apiFetch } from "@/lib/api";
+
+// Placeholder hasta que legal/producto publique la página real — configurable
+// por env var para no tocar este componente cuando exista la URL definitiva.
+const URL_POLITICA_PRIVACIDAD =
+  process.env.NEXT_PUBLIC_URL_POLITICA_PRIVACIDAD || "/politica-privacidad";
 
 interface IglesiaRegistro {
   nombre: string;
@@ -95,6 +101,10 @@ const registroSchema = z.object({
     .optional()
     .refine((file) => !file || FOTO_TIPOS_PERMITIDOS.includes(file.type), "La foto debe ser PNG, JPG o WEBP")
     .refine((file) => !file || file.size <= FOTO_MAX_BYTES, "La foto no puede pesar más de 3MB"),
+  // Solo gatea el envío en el cliente (Ley 21.719): el backend todavía no
+  // tiene dónde guardar el consentimiento, así que este campo nunca se manda
+  // en el body del POST — ver frontend/prompt.md.
+  aceptaPolitica: z.boolean().refine((value) => value === true, "Debes aceptar el tratamiento de tus datos"),
 });
 
 type RegistroValues = z.infer<typeof registroSchema>;
@@ -114,7 +124,15 @@ export default function RegistroIntegrantePage() {
 
   const form = useForm<RegistroValues>({
     resolver: zodResolver(registroSchema),
-    defaultValues: { nombreCompleto: "", run: "", email: "", telefono: "", miembroDesde: "", foto: undefined },
+    defaultValues: {
+      nombreCompleto: "",
+      run: "",
+      email: "",
+      telefono: "",
+      miembroDesde: "",
+      foto: undefined,
+      aceptaPolitica: false,
+    },
   });
 
   useEffect(() => {
@@ -388,13 +406,47 @@ export default function RegistroIntegrantePage() {
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="aceptaPolitica"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-start gap-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
+                            />
+                          </FormControl>
+                          <FormLabel className="text-xs font-normal leading-snug text-muted-foreground">
+                            He leído y acepto el{" "}
+                            <a
+                              href={URL_POLITICA_PRIVACIDAD}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline underline-offset-2 hover:no-underline"
+                            >
+                              tratamiento de mis datos personales
+                            </a>
+                          </FormLabel>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   {serverError && (
                     <Alert variant="destructive">
                       <AlertDescription>{serverError}</AlertDescription>
                     </Alert>
                   )}
 
-                  <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={form.formState.isSubmitting || !form.watch("aceptaPolitica")}
+                  >
                     {form.formState.isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Registrarme"}
                   </Button>
                 </form>

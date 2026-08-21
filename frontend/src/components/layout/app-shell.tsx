@@ -6,7 +6,7 @@ import { useActivityHeartbeat } from "@/hooks/use-activity-heartbeat";
 import { Footer } from "./footer";
 import { Navbar } from "./navbar";
 
-const RUTAS_SIN_SHELL = ["/login"];
+const RUTAS_SIN_SHELL = ["/login", "/politica-privacidad"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
