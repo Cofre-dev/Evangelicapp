@@ -5,8 +5,21 @@ import type { NextConfig } from "next";
 // tocar este archivo cuando cambie el dominio del backend en cada entorno.
 const apiUrl = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001");
 
+// La optimización on-the-fly de next/image (endpoint /_next/image) es gratis
+// y no requiere config en Vercel. En el deploy a Cloudflare Workers (ver
+// wrangler.jsonc, adapter @opennextjs/cloudflare) esa misma optimización
+// requiere contratar Cloudflare Images o un loader custom que además ignora
+// remotePatterns -- ninguna opción es "gratis y sin config" ahí. Como las
+// imágenes de este proyecto (logos de iglesia) ya vienen de un backend y de
+// Supabase Storage públicos por HTTPS, la salida simple para Cloudflare es
+// desactivar la optimización (next/image se comporta como <img> plano) vía
+// esta variable, seteada solo en ese entorno. No afecta Vercel/local: ahí no
+// se define y next/image sigue optimizando igual que hoy.
+const unoptimizedImages = process.env.NEXT_IMAGES_UNOPTIMIZED === "true";
+
 const nextConfig: NextConfig = {
   images: {
+    unoptimized: unoptimizedImages,
     remotePatterns: [
       {
         protocol: apiUrl.protocol === "https:" ? "https" : "http",
