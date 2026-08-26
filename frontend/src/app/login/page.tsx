@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -36,6 +36,7 @@ export default function LoginPage() {
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const usuarioActual = useAuthStore((state) => state.usuario);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Si ya hay una sesión guardada, /login no debe mostrar el formulario de nuevo.
   useEffect(() => {
@@ -99,7 +100,7 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel>Correo electrónico</FormLabel>
                   <FormControl>
-                    <Input type="email" autoComplete="email" placeholder="pastor@demo.cl" {...field} />
+                    <Input type="email" autoComplete="email"  {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -113,7 +114,23 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" autoComplete="current-password" {...field} />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        className="pr-10"
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
