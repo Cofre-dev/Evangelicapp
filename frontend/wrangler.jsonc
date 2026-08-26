@@ -2,8 +2,15 @@
 	// Config de despliegue a Cloudflare Workers vía @opennextjs/cloudflare.
 	// Target de STAGING/QA — no reemplaza el deploy de producción en Vercel
 	// (ver frontend/FEATURES.md, entrada de esta fecha, para el detalle).
+	//
+	// El name tiene que coincidir con el Worker "evangelicapp" que ya existe
+	// en la cuenta de Cloudflare (se creó solo al conectar el repo vía
+	// Workers Builds, antes de que este archivo existiera). Si no coinciden,
+	// wrangler deploy tira el warning "Failed to match Worker name" y
+	// Cloudflare intenta abrir un PR para "corregirlo" -- se evita fijándolo
+	// igual acá.
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "evangelicapp-frontend-staging",
+	"name": "evangelicapp",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2026-08-25",
 	// nodejs_compat: requerido por @opennextjs/cloudflare (usa APIs de Node
