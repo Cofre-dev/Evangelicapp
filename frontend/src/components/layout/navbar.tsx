@@ -197,99 +197,101 @@ export function Navbar() {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="flex w-4/5 flex-col">
-              <SheetHeader>
-                <SheetTitle>Menú</SheetTitle>
-              </SheetHeader>
+            <SheetContent side="right" className="flex w-4/5 flex-col overflow-hidden p-0">
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                <SheetHeader>
+                  <SheetTitle>Menú</SheetTitle>
+                </SheetHeader>
 
-              <div className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-accent/40 px-3 py-3">
-                {usuario.iglesia?.logoUrl ? (
-                  <Image
-                    src={usuario.iglesia.logoUrl}
-                    alt={`Logo de ${usuario.iglesia.nombre}`}
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 shrink-0 rounded-full border border-border object-contain"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-primary">
-                    <Building2 className="h-4 w-4" />
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">@{usuario.username}</p>
-                  {usuario.iglesia && (
-                    <div className="mt-0.5 flex items-center gap-1.5">
-                      <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
-                      <span
-                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PLAN_BADGE_CLASSES[usuario.iglesia.plan]}`}
-                      >
-                        {PLAN_LABEL[usuario.iglesia.plan]}
-                      </span>
+                <div className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-accent/40 px-3 py-3">
+                  {usuario.iglesia?.logoUrl ? (
+                    <Image
+                      src={usuario.iglesia.logoUrl}
+                      alt={`Logo de ${usuario.iglesia.nombre}`}
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 shrink-0 rounded-full border border-border object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-primary">
+                      <Building2 className="h-4 w-4" />
                     </div>
                   )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">@{usuario.username}</p>
+                    {usuario.iglesia && (
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <p className="truncate text-xs text-muted-foreground">{usuario.iglesia.nombre}</p>
+                        <span
+                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PLAN_BADGE_CLASSES[usuario.iglesia.plan]}`}
+                        >
+                          {PLAN_LABEL[usuario.iglesia.plan]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {links.length > 0 && (
-                <nav className="mt-4 flex flex-col gap-1">
-                  {links.map((link) =>
-                    link.type === "group" ? (
-                      <div key={link.label}>
-                        <button
-                          type="button"
-                          onClick={() => toggleGrupo(link.label)}
-                          aria-expanded={gruposAbiertos.has(link.label)}
-                          aria-controls={`grupo-nav-${link.label}`}
-                          className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent/60 hover:text-foreground ${
-                            link.children.some((child) => pathname === child.href)
-                              ? "text-foreground"
-                              : "text-muted-foreground"
-                          }`}
+                {links.length > 0 && (
+                  <nav className="mt-4 flex flex-col gap-1">
+                    {links.map((link) =>
+                      link.type === "group" ? (
+                        <div key={link.label}>
+                          <button
+                            type="button"
+                            onClick={() => toggleGrupo(link.label)}
+                            aria-expanded={gruposAbiertos.has(link.label)}
+                            aria-controls={`grupo-nav-${link.label}`}
+                            className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent/60 hover:text-foreground ${
+                              link.children.some((child) => pathname === child.href)
+                                ? "text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {link.label}
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform ${gruposAbiertos.has(link.label) ? "rotate-180" : ""}`}
+                            />
+                          </button>
+                          {gruposAbiertos.has(link.label) && (
+                            <div id={`grupo-nav-${link.label}`} className="ml-3 mt-1 flex flex-col gap-1 border-l border-border pl-3">
+                              {link.children.map((child) => (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  onClick={() => setMenuAbierto(false)}
+                                  className={
+                                    pathname === child.href
+                                      ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
+                                      : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                                  }
+                                >
+                                  {child.label}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setMenuAbierto(false)}
+                          className={
+                            pathname === link.href
+                              ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
+                              : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                          }
                         >
                           {link.label}
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${gruposAbiertos.has(link.label) ? "rotate-180" : ""}`}
-                          />
-                        </button>
-                        {gruposAbiertos.has(link.label) && (
-                          <div id={`grupo-nav-${link.label}`} className="ml-3 mt-1 flex flex-col gap-1 border-l border-border pl-3">
-                            {link.children.map((child) => (
-                              <Link
-                                key={child.href}
-                                href={child.href}
-                                onClick={() => setMenuAbierto(false)}
-                                className={
-                                  pathname === child.href
-                                    ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
-                                    : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                                }
-                              >
-                                {child.label}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setMenuAbierto(false)}
-                        className={
-                          pathname === link.href
-                            ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
-                            : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                        }
-                      >
-                        {link.label}
-                      </Link>
-                    ),
-                  )}
-                </nav>
-              )}
+                        </Link>
+                      ),
+                    )}
+                  </nav>
+                )}
+              </div>
 
-              <div className="mt-auto border-t border-border pt-4">
+              <div className="shrink-0 border-t border-border px-6 py-4">
                 <Button
                   type="button"
                   variant="outline"
