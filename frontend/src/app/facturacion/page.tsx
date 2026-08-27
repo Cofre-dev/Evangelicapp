@@ -124,6 +124,12 @@ export default function FacturacionPage() {
               </CardContent>
             </Card>
 
+            {data.facturacion.enMora && (
+              <Alert variant="destructive">
+                <AlertDescription>Si pasas 3 días sin pagar se te podría bloquear tu cuenta.</AlertDescription>
+              </Alert>
+            )}
+
             <Card>
               <CardContent className="space-y-3 pt-6 text-sm text-muted-foreground">
                 <p>
@@ -136,16 +142,18 @@ export default function FacturacionPage() {
                   </a>{" "}
                   con el asunto &ldquo;{asuntoPago}&rdquo;.
                 </p>
-                <p>
-                  Si quieres subir de plan, manda un correo a{" "}
-                  <a
-                    href={`mailto:${CONTACTO_EMAIL}?subject=${encodeURIComponent(asuntoUpgrade)}`}
-                    className="text-primary underline"
-                  >
-                    {CONTACTO_EMAIL}
-                  </a>{" "}
-                  con el asunto &ldquo;{asuntoUpgrade}&rdquo;.
-                </p>
+                {data.plan !== "PRO" && (
+                  <p>
+                    Si quieres subir de plan, manda un correo a{" "}
+                    <a
+                      href={`mailto:${CONTACTO_EMAIL}?subject=${encodeURIComponent(asuntoUpgrade)}`}
+                      className="text-primary underline"
+                    >
+                      {CONTACTO_EMAIL}
+                    </a>{" "}
+                    con el asunto &ldquo;{asuntoUpgrade}&rdquo;.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </>
