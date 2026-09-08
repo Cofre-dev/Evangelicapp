@@ -39,6 +39,22 @@ export interface PredicadorRespondioPayload {
 }
 
 /**
+ * Payload del evento de Realtime `asistencia:respondida` (canal privado
+ * `tenant:<iglesiaId>`, ver `src/hooks/use-realtime.ts` y `frontend/prompt.md`)
+ * — se dispara cuando un integrante responde la convocatoria a un evento desde
+ * el link público del correo. `integranteId` matchea contra
+ * `AsistenciaResumen.integranteId`. `estado` nunca es `PENDIENTE` acá (solo se
+ * emite al responder), pero es asignable a `EstadoAsistencia`.
+ */
+export interface AsistenciaRespondidaPayload {
+  eventoId: string;
+  integranteId: string;
+  nombreCompleto: string;
+  estado: Extract<EstadoAsistencia, "CONFIRMADO" | "RECHAZADO">;
+  respondidoAt: string;
+}
+
+/**
  * Shape devuelto por `GET /agenda/asistencias/:token` y
  * `POST /agenda/asistencias/:token/responder` — ruta pública sin sesión,
  * análoga a la de predicadores pero para el RSVP de Integrantes.

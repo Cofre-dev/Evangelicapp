@@ -42,6 +42,7 @@ CI (`.github/workflows/ci.yml`) corre `lint`, `typecheck` y `build` en cada PR/p
 | Variable                | Descripción                                                                 |
 | ------------------------ | ---------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL`    | URL base del backend. Se usa tanto en `src/lib/api.ts` como para derivar el dominio permitido de imágenes en `next.config.ts` (`images.remotePatterns`) — no hace falta tocar `next.config.ts` al cambiar de entorno, solo esta variable. |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Proyecto Supabase "Backend" — usadas **solo** por el canal de Supabase Realtime (ver "Tiempo real"). La anon key no es secreta (publishable). Si faltan, la app corre sin tiempo real (sin romper). |
 
 ## Estructura del proyecto
 
@@ -84,6 +85,15 @@ Sesión basada en cookies `httpOnly` (`access_token`, `refresh_token`, `csrf_tok
 - Si una request responde `401`, intenta `POST /auth/refresh` una vez (coordinado entre pestañas con la Web Locks API para no disparar refreshes en paralelo) y reintenta la request original; si el refresh también falla, limpia la sesión y redirige a `/login`.
 
 Contrato completo (nombres/atributos de cookies, endpoints, CSRF, rotación de refresh token) en [`docs/auth-cookies.md`](./docs/auth-cookies.md).
+
+## Tiempo real
+
+Tres pantallas ("en vivo") se actualizan sin refrescar: dashboard de SuperAdmin, detalle de evento (badges de predicadores) y censo QR. El transporte es **Supabase Realtime (Broadcast)** vía `@supabase/supabase-js`, usado **exclusivamente** para eso — los datos de negocio siguen yendo por `apiFetch`.
+
+- `src/lib/supabase-realtime.ts`: cliente singleton (sin sesión de supabase-auth). Requiere `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (proyecto Supabase "Backend"); si faltan, la app arranca en modo "sin realtime" y las pantallas funcionan igual con su carga REST.
+- `src/hooks/use-realtime.ts`: `useRealtimeEvent('<evento>', handler)`. Mantiene UN canal privado por sesión, autenticado con un JWT corto de `GET /realtime/token` (renovado antes de expirar y tras cada refresh de sesión).
+
+Detalle en [`FEATURES.md`](./FEATURES.md) (entrada de 2026-09-08).
 
 ## Backend
 

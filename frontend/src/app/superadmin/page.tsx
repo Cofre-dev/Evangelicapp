@@ -13,9 +13,9 @@ import { VerticalBars } from "@/components/dashboard/vertical-bars";
 import { formatHoraUTC, formatMesCorto, formatRangoFechas } from "@/components/dashboard/format";
 import type { SuperAdminDashboardResponse } from "@/components/dashboard/types";
 import { IglesiaLogo } from "@/components/iglesias/iglesia-logo";
-import { PLAN_BADGE_CLASSES, PLAN_LABEL, type IglesiaListItem } from "@/components/iglesias/types";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { useSocket } from "@/hooks/use-socket";
+import { useRealtimeEvent } from "@/hooks/use-realtime";
 import { ApiError, apiFetch } from "@/lib/api";
 
 const CERTIFICADOS_LABEL: Record<keyof SuperAdminDashboardResponse["certificados"]["porTipo"], string> = {
@@ -50,31 +50,20 @@ export default function SuperAdminDashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
-  const socket = useSocket();
-
   // Realtime (ver frontend/prompt.md): parcha la fila en "Iglesias recientes"
   // sin refetch. No agrega filas nuevas — esa lista es "recién creadas", no
   // "recién actualizadas", y el propio evento nunca se dispara para un alta
   // (`iglesia:actualizada` solo cubre las 4 acciones de facturación/estado
   // sobre una iglesia ya existente).
-  useEffect(() => {
-    if (!socket) return;
-
-    function onIglesiaActualizada(iglesia: IglesiaListItem) {
-      setData((prev) => {
-        if (!prev || !prev.iglesiasRecientes.some((i) => i.id === iglesia.id)) return prev;
-        return {
-          ...prev,
-          iglesiasRecientes: prev.iglesiasRecientes.map((i) => (i.id === iglesia.id ? iglesia : i)),
-        };
-      });
-    }
-
-    socket.on("iglesia:actualizada", onIglesiaActualizada);
-    return () => {
-      socket.off("iglesia:actualizada", onIglesiaActualizada);
-    };
-  }, [socket]);
+  useRealtimeEvent("iglesia:actualizada", (iglesia) => {
+    setData((prev) => {
+      if (!prev || !prev.iglesiasRecientes.some((i) => i.id === iglesia.id)) return prev;
+      return {
+        ...prev,
+        iglesiasRecientes: prev.iglesiasRecientes.map((i) => (i.id === iglesia.id ? iglesia : i)),
+      };
+    });
+  });
 
   if (!ready || !usuario) {
     return null;

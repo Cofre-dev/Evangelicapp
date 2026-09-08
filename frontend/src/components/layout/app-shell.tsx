@@ -20,7 +20,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const ocultarShell =
     RUTAS_SIN_SHELL.includes(pathname) ||
     pathname.startsWith("/predicacion/") ||
-    pathname.startsWith("/integrantes/registro/");
+    pathname.startsWith("/integrantes/registro/") ||
+    pathname.startsWith("/recuperar-contrasena");
 
   if (ocultarShell) {
     return <>{children}</>;

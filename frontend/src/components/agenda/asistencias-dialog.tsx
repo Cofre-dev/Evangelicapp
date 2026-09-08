@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useRealtimeEvent } from "@/hooks/use-realtime";
 import { ApiError, apiFetch } from "@/lib/api";
 import { ESTADO_ASISTENCIA_CLASS, ESTADO_ASISTENCIA_LABEL, type AsistenciaResumen, type EstadoAsistencia } from "./types";
 
@@ -36,6 +37,22 @@ export function AsistenciasDialog({ open, onOpenChange, eventoId, eventoTitulo }
       .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudieron cargar las asistencias"))
       .finally(() => setLoading(false));
   }, [open, eventoId]);
+
+  // Realtime (ver frontend/prompt.md): un integrante respondió la convocatoria
+  // desde el link del correo — parcha su fila sin recargar, solo si el diálogo
+  // está abierto para ese evento. Los contadores por grupo (Confirmaron / Sin
+  // responder / Rechazaron) se derivan de `asistencias` con `.filter`, así que
+  // se re-renderizan solos.
+  useRealtimeEvent("asistencia:respondida", (payload) => {
+    if (!open || payload.eventoId !== eventoId) return;
+    setAsistencias((prev) =>
+      prev.map((a) =>
+        a.integranteId === payload.integranteId
+          ? { ...a, estado: payload.estado, respondidoAt: payload.respondidoAt }
+          : a,
+      ),
+    );
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

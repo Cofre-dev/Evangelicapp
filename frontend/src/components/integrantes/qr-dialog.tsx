@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useSocket } from "@/hooks/use-socket";
+import { useRealtimeEvent } from "@/hooks/use-realtime";
 import { ApiError, apiFetch } from "@/lib/api";
 import type { IntegranteRegistradoPayload, QrInfo } from "./types";
 
@@ -30,7 +30,6 @@ export function QrDialog() {
   const [confirmandoRegenerar, setConfirmandoRegenerar] = useState(false);
   const [regenerando, setRegenerando] = useState(false);
   const [recienCensados, setRecienCensados] = useState<IntegranteRegistradoPayload[]>([]);
-  const socket = useSocket();
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -56,18 +55,10 @@ export function QrDialog() {
   // Realtime (ver frontend/prompt.md): censo en vivo mientras el diálogo está
   // abierto — pensado para proyectar en pantalla durante el evento. La lista
   // se reinicia cada vez que se abre (arriba), no persiste entre aperturas.
-  useEffect(() => {
-    if (!socket || !open) return;
-
-    function onIntegranteRegistrado(integrante: IntegranteRegistradoPayload) {
-      setRecienCensados((prev) => [integrante, ...prev]);
-    }
-
-    socket.on("integrante:registrado", onIntegranteRegistrado);
-    return () => {
-      socket.off("integrante:registrado", onIntegranteRegistrado);
-    };
-  }, [socket, open]);
+  useRealtimeEvent("integrante:registrado", (integrante) => {
+    if (!open) return;
+    setRecienCensados((prev) => [integrante, ...prev]);
+  });
 
   useEffect(() => {
     if (!qrInfo) {

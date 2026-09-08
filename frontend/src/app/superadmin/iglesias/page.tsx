@@ -19,7 +19,7 @@ import {
   type IglesiaListItem,
 } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { useSocket } from "@/hooks/use-socket";
+import { useRealtimeEvent } from "@/hooks/use-realtime";
 import { ApiError, apiFetch } from "@/lib/api";
 import { REGIONES_CHILE } from "@/lib/chile-regiones";
 
@@ -115,27 +115,16 @@ function IglesiasContent() {
     cargar();
   }, [cargar]);
 
-  const socket = useSocket();
-
   // Realtime (ver frontend/prompt.md): parcha la fila en vez de refetchear el
   // listado completo. Solo actualiza filas ya cargadas — no inserta iglesias
   // nuevas que hayan empezado a matchear los filtros activos recién con este
   // cambio, porque no hay forma de saber eso sin volver a pedir la lista.
-  useEffect(() => {
-    if (!socket) return;
-
-    function onIglesiaActualizada(iglesia: IglesiaListItem) {
-      setData((prev) => {
-        if (!prev || !prev.some((i) => i.id === iglesia.id)) return prev;
-        return prev.map((i) => (i.id === iglesia.id ? iglesia : i));
-      });
-    }
-
-    socket.on("iglesia:actualizada", onIglesiaActualizada);
-    return () => {
-      socket.off("iglesia:actualizada", onIglesiaActualizada);
-    };
-  }, [socket]);
+  useRealtimeEvent("iglesia:actualizada", (iglesia) => {
+    setData((prev) => {
+      if (!prev || !prev.some((i) => i.id === iglesia.id)) return prev;
+      return prev.map((i) => (i.id === iglesia.id ? iglesia : i));
+    });
+  });
 
   if (!ready || !usuario) {
     return null;

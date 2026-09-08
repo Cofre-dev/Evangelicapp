@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -30,13 +31,19 @@ interface LoginResponse {
   csrfToken: string;
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const usuarioActual = useAuthStore((state) => state.usuario);
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Flash tras restablecer la contraseña desde /recuperar-contrasena/<token>:
+  // esa página redirige acá con ?reset=ok. El backend ya cerró las sesiones
+  // del usuario, así que llega deslogueado y tiene que entrar con la nueva.
+  const resetOk = searchParams.get("reset") === "ok";
 
   // Si ya hay una sesión guardada, /login no debe mostrar el formulario de nuevo.
   useEffect(() => {
@@ -91,6 +98,12 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-muted-foreground">Ingresa con las credenciales de tu iglesia</p>
         </div>
 
+        {resetOk && (
+          <Alert className="mt-6 border-emerald-200 bg-emerald-100 text-emerald-700">
+            <AlertDescription>Tu contraseña se actualizó. Inicia sesión con la nueva.</AlertDescription>
+          </Alert>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="mt-8 space-y-4">
             <FormField
@@ -137,6 +150,15 @@ export default function LoginPage() {
               )}
             />
 
+            <div className="text-right">
+              <Link
+                href="/recuperar-contrasena"
+                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
             {serverError && (
               <Alert variant="destructive">
                 <AlertDescription>{serverError}</AlertDescription>
@@ -154,5 +176,13 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -22,17 +22,20 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const REFRESH_PATH = "/auth/refresh";
 
 // Rutas mutantes públicas, exentas de CSRF en el backend a propósito (no
-// requieren sesión, se autentican con un token de un solo uso en la URL). Si
-// el mismo navegador además tiene una sesión de staff activa (ej. un pastor
-// probando su propio link de QR en otra pestaña), no hay que arrastrar esas
-// requests al circuito de recuperación de csrfToken — no lo necesitan y
-// terminarían mandando a un visitante/staff a /login sin motivo. Confirmado
-// contra el backend real: estas rutas responden sin exigir el header aunque
-// haya cookies de sesión presentes.
+// requieren sesión: se autentican con un token de un solo uso en la URL o en
+// el body, o son anti-enumeración puras como forgot-password). Si el mismo
+// navegador además tiene una sesión de staff activa (ej. un pastor probando su
+// propio link de QR, o abriendo la landing de "olvidé mi contraseña" en otra
+// pestaña), no hay que arrastrar esas requests al circuito de recuperación de
+// csrfToken — no lo necesitan y terminarían mandando a un visitante/staff a
+// /login sin motivo. Confirmado contra el backend real: estas rutas responden
+// sin exigir el header aunque haya cookies de sesión presentes.
 const CSRF_EXEMPT_PATHS = [
   /^\/integrantes\/registro\//,
   /^\/agenda\/predicadores\/[^/]+\/responder$/,
   /^\/agenda\/asistencias\/[^/]+\/responder$/,
+  /^\/auth\/forgot-password$/,
+  /^\/auth\/reset-password$/,
 ];
 
 function isCsrfExempt(path: string): boolean {
@@ -49,11 +52,12 @@ export function setCsrfToken(token: string | null): void {
   csrfToken = token;
 }
 
-// El socket de Realtime (ver useSocket) necesita reconectar con la cookie
-// access_token nueva después de cada refresh exitoso — mientras una conexión
-// WebSocket está viva no vuelve a mandar cookies por su cuenta, así que si no
-// se reconecta explícitamente queda pegado al token viejo hasta que el
-// servidor la corte por expirado (ver frontend/prompt.md, sección 1).
+// El canal de Supabase Realtime (ver src/hooks/use-realtime.ts) se autentica
+// con un JWT corto que devuelve `GET /realtime/token` (endpoint protegido por
+// la cookie de sesión). Cuando la sesión se refresca acá, el hook re-pide ese
+// token y vuelve a llamar `supabase.realtime.setAuth(...)`. Originalmente este
+// registro existía para que el socket propio (Socket.IO) reconectara con la
+// cookie `access_token` nueva; el transporte cambió, el punto de enganche no.
 const refreshListeners = new Set<() => void>();
 
 export function onSessionRefreshed(listener: () => void): () => void {

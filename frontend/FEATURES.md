@@ -6,6 +6,74 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-08 — Recuperación de contraseña + asistencia en vivo + hint de predicador
+
+**Por qué**: brief del backend en `frontend/prompt.md`. El backend ya implementó y desplegó su parte en `staging` (Render + Supabase `Backend-staging`). Tres bloques independientes.
+
+### Bloque 1 — Recuperación de contraseña (páginas nuevas, públicas)
+
+Antes no había forma de recuperar una contraseña olvidada: el único reset era el modal obligatorio del primer login (`change-password-modal.tsx`, requiere sesión + contraseña temporal). Ahora hay flujo público por correo.
+
+- **`src/lib/api.ts`**: `POST /auth/forgot-password` y `POST /auth/reset-password` sumadas a `CSRF_EXEMPT_PATHS` (mismo motivo que `integrantes/registro` y los `responder` de agenda: son públicas y en el backend están exentas de CSRF; si un usuario logueado abre la landing en el mismo navegador, su cookie no debe arrastrar la request al circuito de recuperación de `csrfToken`).
+- **`src/app/recuperar-contrasena/page.tsx`** (nueva): input de email → `POST /auth/forgot-password`. El backend **siempre responde 200** (anti-enumeración), así que el frontend muestra **siempre** el mismo mensaje neutro y oculta el formulario. `429` → mensaje de "espera unos minutos"; error de red → mensaje genérico + reintento (form visible). Misma estética que `/login` (logo, `max-w-sm`, blur).
+- **`src/app/recuperar-contrasena/[token]/page.tsx`** (nueva): landing del link del correo. Token del route param (`useParams`, sin `useSearchParams` → no necesita Suspense). Dos campos (nueva + confirmar) con toggle mostrar/ocultar y `autoComplete="new-password"`. **Schema idéntico al de `change-password-modal.tsx`** (min 8, `/(?=.*[a-zA-Z])(?=.*[0-9])/`, confirmación con `.refine`). Botón deshabilitado hasta `form.formState.isValid` (`mode: "onChange"`). `POST /auth/reset-password { token, newPassword }` → 200 redirige a `/login?reset=ok`; 400 muestra `err.message` + link a `/recuperar-contrasena` para pedir otro; otro error → genérico + reintento. **No toca el auth-store ni llama endpoints autenticados** (el usuario no está logueado acá; el backend además cierra sus sesiones al resetear).
+- **`src/app/login/page.tsx`**: link discreto "¿Olvidaste tu contraseña?" bajo el campo de contraseña → `/recuperar-contrasena`. Además lee `?reset=ok` (nuevo `useSearchParams`, por eso el componente se envolvió en `<Suspense>` — mismo patrón que `cuenta-suspendida` / `superadmin/iglesias`; la página sigue siendo estática en el build) y muestra un `Alert` verde de éxito. Caso borde conocido: si un usuario con sesión persistida en `localStorage` (pero cookies ya muertas por el reset) cae en `/login?reset=ok`, el efecto lo manda a `/` y de ahí el primer `401` lo devuelve a `/login` limpio — se pierde el flash pero no rompe; es un escenario marginal (quien "olvidó su contraseña" casi nunca está logueado).
+- **`src/components/layout/app-shell.tsx`**: `pathname.startsWith("/recuperar-contrasena")` sumado a `ocultarShell` (sin navbar/footer, igual que `/login` y `/predicacion/`).
+
+### Bloque 2 — Asistencia a eventos en vivo
+
+- **`src/components/agenda/types.ts`**: nuevo tipo `AsistenciaRespondidaPayload` (`{ eventoId, integranteId, nombreCompleto, estado: "CONFIRMADO"|"RECHAZADO", respondidoAt }`).
+- **`src/hooks/use-realtime.ts`**: `"asistencia:respondida"` sumado a `RealtimeEventPayloads` + `EVENT_NAMES` (canal privado `tenant:<iglesiaId>`, el mismo que ya usa `predicador:respondio`).
+- **`src/components/agenda/asistencias-dialog.tsx`**: además del fetch único al abrir, `useRealtimeEvent("asistencia:respondida", …)` parcha la fila del integrante (`estado`/`respondidoAt`) por `integranteId` si `payload.eventoId === eventoId` y el diálogo está abierto (`if (!open || payload.eventoId !== eventoId) return` dentro del handler — mismo patrón condicional que `evento-dialog.tsx`, no hizo falta un subcomponente). Los contadores por grupo (Confirmaron / Sin responder / Rechazaron) se derivan de `asistencias` con `.filter`, se re-renderizan solos.
+
+### Bloque 3 — Hint del nombre del predicador (ajuste menor)
+
+- **`src/components/agenda/evento-dialog.tsx`**: al crear un evento tipo CULTO con "Avisar a la congregación por correo" activado, el texto de ayuda de la sección Predicadores suma una aclaración: *"El nombre aparece en el correo a la congregación. Sin nombre, no se menciona al predicador."* Es solo un hint — el nombre **sigue siendo opcional** (el backend acepta el email suelto; simplemente no lo muestra a los integrantes). Se agrega vía un `form.watch("notificarIntegrantes")` nuevo.
+
+**Verificación**: `npm run lint`, `npm run typecheck`, `npm run build` y `npm run cf:build` (target staging) pasan limpios. **No se probó contra el backend real** (misma limitación de siempre): falta QA e2e de los 3 flujos — pedir link de reset y completarlo end-to-end (incluye que Resend esté configurado en el Render de staging, ver nota abajo), responder una convocatoria desde otro dispositivo con el `AsistenciasDialog` abierto y ver la fila parchearse, y crear un CULTO con notificación + predicador sin nombre para ver el hint.
+
+**Pendiente de infra (no es código, del brief del backend)**: en el Render de staging hay que setear `MAIL_PROVIDER=resend`, `RESEND_API_KEY=re_...` y `MAIL_FROM="EvangelicApp <no-reply@evangelicapp.cl>"` — sin eso los correos de recuperación salen por SMTP local y no llegan a nadie en staging.
+
+`frontend/prompt.md` se vació — brief completamente consumido (mismo criterio que el resto de esta bitácora).
+
+---
+
+## 2026-09-08 — Realtime: migración de Socket.IO a Supabase Realtime (Broadcast)
+
+**Por qué**: brief del backend en `frontend/prompt.md`. El backend dejó de mantener un servidor WebSocket propio stateful (el gateway de Socket.IO de la entrada del 2026-08-13) y pasa a **Supabase Realtime**, que ya viene con el plan. Es un **parallel-run**: al momento de este cambio el backend emite por **los dos transportes a la vez** (Socket.IO + Supabase Broadcast) y expone el endpoint nuevo `GET /realtime/token`. Cuando este PR esté mergeado y verificado en staging, el backend saca Socket.IO en un PR de limpieza. Plan completo: `docs/realtime-migration.md` en el repo del backend.
+
+**Sólo cambió el transporte** — los 3 nombres de evento (`iglesia:actualizada`, `predicador:respondio`, `integrante:registrado`) y la forma de sus payloads son idénticos a los de Socket.IO. `@supabase/supabase-js` entra al frontend **exclusivamente para el canal de Realtime**: los datos de negocio se siguen pidiendo con `apiFetch` (cookies httpOnly contra el backend NestJS), nada de `supabase.from(...)`, auth de supabase ni storage.
+
+**Qué se implementó**:
+
+- **`package.json`**: `npm rm socket.io-client` + `npm i @supabase/supabase-js` (`^2.116.0`).
+- **`src/lib/supabase-realtime.ts`** (nuevo): `getSupabaseRealtimeClient()` — singleton `createClient` con `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (proyecto Supabase "Backend", el de la BD). `persistSession`/`autoRefreshToken`/`detectSessionInUrl` en `false` — no hay sesión de supabase-auth. Devuelve `null` si faltan las env vars → el hook queda en modo "sin realtime".
+- **`src/hooks/use-realtime.ts`** (nuevo, reemplaza `use-socket.ts`): expone `useRealtimeEvent('<evento>', handler)`.
+  - Un **canal singleton privado** (`supabase.channel(topic, { config: { private: true } })`) por usuario. `topic` (`'superadmin'` o `'tenant:<iglesiaId>'`) lo decide el backend en `GET /realtime/token` según el rol/iglesia de la sesión — el frontend no le manda ningún parámetro ni computa el topic.
+  - Autenticación vía `supabase.realtime.setAuth(token)` con el JWT corto (HS256, `expiresInSeconds: 1800`) que devuelve el endpoint. **Timer de renovación** a los `expiresInSeconds - 60s`: re-pide token y vuelve a llamar `setAuth` antes de que expire (si expira, Supabase corta la conexión). Rate limit del endpoint 30/min por IP — con un refresh cada ~29 min sobra.
+  - Se **re-pide token + `setAuth` también en `onSessionRefreshed`** (`src/lib/api.ts`) — el mismo punto de enganche que usaba `use-socket` para reconectar tras rotar la cookie; se adaptó, no se borró (nadie más lo escucha, verificado por grep).
+  - **Modo "sin realtime"** si `GET /realtime/token` da 503 (backend sin `SUPABASE_JWT_SECRET`) o faltan las env vars de Supabase: no se conecta y no spamea la consola. Un 503 lo marca sticky (no reintenta en la sesión); un fallo genérico no, así que un mount posterior o un refresh de sesión puede reintentar sin loop.
+  - **Registro de handlers por evento + fan-out**: como un `RealtimeChannel` de supabase no tiene un `.off(listener)` limpio, el módulo mantiene el canal singleton y un `Map<evento, Set<handler>>`. `.on('broadcast', { event }, ...)` se registra **una sola vez por evento** (los 3, al crear el canal, antes de `.subscribe()`) y hace fan-out. `useRealtimeEvent` suma/saca su handler del set en un `useEffect`; el handler va por un ref para poder ser inline sin re-suscribir el canal en cada render. Refcount: cuando baja a 0 (todos los consumidores desmontados o sesión perdida) → `removeChannel` + clear timer + desregistro de `onSessionRefreshed`.
+  - `useRealtimeEvent` sólo engancha si hay `usuario.id` en el auth store (misma condición de sesión que tenía `use-socket`).
+- **4 consumidores migrados** — la lógica de cada handler **no cambió**, sólo de dónde sale el evento (de `socket.on(...)` a `useRealtimeEvent(...)`). El guard `open`/`esEdicion`/`evento` que en `evento-dialog.tsx` y `qr-dialog.tsx` estaba en el array de deps del `useEffect` ahora vive dentro del callback (el handler lee estado siempre fresco vía el ref):
+  - `src/app/superadmin/page.tsx` y `src/app/superadmin/iglesias/page.tsx` → `iglesia:actualizada` (parchan la fila por `id`, nunca insertan — misma decisión que la entrada del 2026-08-13).
+  - `src/components/agenda/evento-dialog.tsx` → `predicador:respondio`.
+  - `src/components/integrantes/qr-dialog.tsx` → `integrante:registrado`.
+- **Comentarios actualizados**: `src/lib/api.ts` (bloque de `onSessionRefreshed`), y los tipos `PredicadorRespondioPayload` / `IntegranteRegistradoPayload` ya decían "Realtime" (se dejaron). `use-socket.ts` se borró.
+- **`.env.example`**: documentadas `NEXT_PUBLIC_SUPABASE_URL` (con valor) y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (vacía — la anon key no es secreta pero no se commitea; sacarla del dashboard de Supabase o pedirla al equipo).
+
+**Qué queda abierto / pendiente** (coordinación con backend/infra, no es código):
+1. **Env vars en los deploys**: agregar `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` a Vercel (prod) y a Cloudflare Workers (staging, panel **Settings → Builds → Variables** — mismo error del que habla la entrada del 2026-08-25, si van al panel equivocado `next build` no las ve). Sin ellas el sitio queda en modo "sin realtime" (no rompe, pero no hay tiempo real).
+2. **Backend antes de probar staging**: aplicar la migración de RLS sobre `realtime.messages` a `Backend-staging` y setear `SUPABASE_JWT_SECRET` en Render. Hasta entonces `GET /realtime/token` responde 503 y las 3 pantallas funcionan sólo con su carga REST.
+3. **QA end-to-end** (no se pudo en esta sesión — hace falta el backend real con `/realtime/token` operativo y Supabase con la RLS puesta): confirmar los 3 flujos (fila de iglesia parcheándose en las 2 pantallas de SuperAdmin desde otra pestaña; badge de predicador cambiando con el diálogo abierto; "Recién censados" apareciendo al escanear el QR desde otro dispositivo), y forzar la renovación del token (esperar >29 min con una pantalla abierta) para ver que `setAuth` renueva sin cortar el canal.
+4. Cuando esto esté verificado en staging, avisar al backend para el PR de limpieza que saca Socket.IO.
+
+**Verificación**: `npm run lint`, `npm run typecheck` y `npm run build` (con `NEXT_PUBLIC_API_URL=http://localhost:3001`, como CI, y **sin** las env vars de Supabase) pasan limpios. No se probó contra un backend real ni con Supabase configurado (ver pendientes 2 y 3).
+
+`frontend/prompt.md` se vació — brief completamente consumido (mismo criterio que el resto de esta bitácora).
+
+---
+
 ## 2026-08-25 — Deploy de staging a Cloudflare Workers (adapter @opennextjs/cloudflare)
 
 **Por qué**: se creó la rama `staging` para QA pre-producción y se pidió desplegarla en Cloudflare como target nuevo, sin reemplazar Vercel (que sigue siendo producción). Cloudflare **ya no recomienda Cloudflare Pages para Next.js con App Router** salvo `output: "export"` puro — para SSR/rutas dinámicas el camino actual es **Cloudflare Workers**. Este repo tiene 8 segmentos dinámicos no enumerables en build time (`agenda/asistencia/[token]`, 4× `ceremonias/*/[id]`, `integrantes/registro/[qrToken]`, `predicacion/[token]`, `superadmin/iglesias/[id]` — confirmado por el propio `next build`, que los marca `ƒ (Dynamic) server-rendered on demand`), así que un export estático puro no sirve: rompería esas rutas porque no hay servidor que resuelva un token/id arbitrario en runtime.

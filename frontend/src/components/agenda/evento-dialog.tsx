@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSocket } from "@/hooks/use-socket";
+import { useRealtimeEvent } from "@/hooks/use-realtime";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { AsistenciasDialog } from "./asistencias-dialog";
@@ -22,7 +22,6 @@ import {
   TIPO_EVENTO_LABEL,
   type Evento,
   type Predicador,
-  type PredicadorRespondioPayload,
   type TipoEvento,
 } from "./types";
 
@@ -172,31 +171,20 @@ export function EventoDialog({
     }
   }, [open, evento, defaultDate, form]);
 
-  const socket = useSocket();
-
   // Realtime (ver frontend/prompt.md): el predicador respondió desde el link
   // del email — actualiza el badge sin recargar, solo si el evento que
-  // responde es el que está abierto en este diálogo.
-  useEffect(() => {
-    if (!socket || !open || !esEdicion || !evento) return;
-    const eventoId = evento.id;
-
-    function onPredicadorRespondio(payload: PredicadorRespondioPayload) {
-      if (payload.eventoId !== eventoId) return;
-      setPredicadores((prev) =>
-        prev.map((p) =>
-          p.id === payload.predicadorId ? { ...p, estado: payload.estado, respondidoAt: payload.respondidoAt } : p,
-        ),
-      );
-    }
-
-    socket.on("predicador:respondio", onPredicadorRespondio);
-    return () => {
-      socket.off("predicador:respondio", onPredicadorRespondio);
-    };
-  }, [socket, open, esEdicion, evento]);
+  // responde es el que está abierto en este diálogo en modo edición.
+  useRealtimeEvent("predicador:respondio", (payload) => {
+    if (!open || !esEdicion || !evento || payload.eventoId !== evento.id) return;
+    setPredicadores((prev) =>
+      prev.map((p) =>
+        p.id === payload.predicadorId ? { ...p, estado: payload.estado, respondidoAt: payload.respondidoAt } : p,
+      ),
+    );
+  });
 
   const tipoSeleccionado = form.watch("tipo");
+  const notificarIntegrantes = form.watch("notificarIntegrantes");
 
   function agregarPredicador() {
     const email = nuevoEmail.trim();
@@ -545,6 +533,12 @@ export function EventoDialog({
                     )}
                     <p className="text-xs text-muted-foreground">
                       Se les enviará un correo con un link para confirmar o rechazar.
+                      {notificarIntegrantes && (
+                        <>
+                          {" "}
+                          El nombre aparece en el correo a la congregación. Sin nombre, no se menciona al predicador.
+                        </>
+                      )}
                     </p>
                   </>
                 )}
