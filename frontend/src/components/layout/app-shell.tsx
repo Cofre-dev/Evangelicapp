@@ -21,7 +21,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     RUTAS_SIN_SHELL.includes(pathname) ||
     pathname.startsWith("/predicacion/") ||
     pathname.startsWith("/integrantes/registro/") ||
-    pathname.startsWith("/recuperar-contrasena");
+    pathname.startsWith("/recuperar-contrasena") ||
+    // Links públicos que llegan por correo (sin sesión): estado de convocatoria
+    // y RSVP de un integrante. Igual que /predicacion/, van sin navbar/footer.
+    pathname.startsWith("/agenda/convocatoria/") ||
+    pathname.startsWith("/agenda/asistencia/");
 
   if (ocultarShell) {
     return <>{children}</>;

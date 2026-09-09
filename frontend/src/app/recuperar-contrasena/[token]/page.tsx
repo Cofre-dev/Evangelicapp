@@ -13,7 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, setCsrfToken } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
 import logoMark from "@/img/photo/logo-mark.png";
 
 // Misma política que change-password-modal.tsx (primer login): mínimo 8, al
@@ -58,7 +59,12 @@ export default function ResetContrasenaPage() {
         method: "POST",
         body: JSON.stringify({ token, newPassword: values.newPassword }),
       });
-      // El backend ya cerró las sesiones del usuario: llega deslogueado a /login.
+      // El backend cierra las sesiones del usuario al resetear. Si este mismo
+      // navegador tenía una sesión persistida (cookies ya muertas, pero el
+      // `usuario` sigue en localStorage), hay que limpiarla acá o /login lo
+      // rebotaría a "/" y de ahí un 401 lo traería de vuelta sin ver el aviso.
+      setCsrfToken(null);
+      useAuthStore.getState().clearSession();
       router.replace("/login?reset=ok");
     } catch (error) {
       if (error instanceof ApiError && error.status === 400) {

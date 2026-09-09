@@ -125,3 +125,15 @@ export interface AsistenciaResumen {
   estado: EstadoAsistencia;
   respondidoAt: string | null;
 }
+
+/**
+ * Shape de `GET /agenda/eventos/:id/convocatoria` (MANAGER/USUARIO con módulo
+ * AGENDA) — vista unificada de predicadores invitados + RSVP de la
+ * congregación para un evento (ver `frontend/prompt.md`, bloque A).
+ * `predicadores` reusa `Predicador` (incluye email); `asistencias` reusa
+ * `AsistenciaResumen`.
+ */
+export interface ConvocatoriaResumen {
+  predicadores: Predicador[];
+  asistencias: AsistenciaResumen[];
+}

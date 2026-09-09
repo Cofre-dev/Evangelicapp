@@ -79,6 +79,17 @@ function LoginContent() {
         router.push(`/cuenta-suspendida?dias=${dias}`);
         return;
       }
+      // Rate limit por cuenta: 3 intentos fallidos seguidos → 10 min de bloqueo
+      // (a los 5 la cuenta se desactiva y vuelve como 401 genérico). El link
+      // "¿Olvidaste tu contraseña?" de abajo limpia el contador si aún no llegó
+      // a 5, por eso el mensaje lo menciona.
+      if (error instanceof ApiError && (error.body as { code?: string } | null)?.code === "CUENTA_BLOQUEADA") {
+        const min = (error.body as { minutosRestantes?: number }).minutosRestantes ?? 10;
+        setServerError(
+          `Demasiados intentos fallidos. Prueba de nuevo en ${min} ${min === 1 ? "minuto" : "minutos"}, o restablece tu contraseña.`,
+        );
+        return;
+      }
       setServerError(error instanceof ApiError ? error.message : "No se pudo iniciar sesión");
     }
   }

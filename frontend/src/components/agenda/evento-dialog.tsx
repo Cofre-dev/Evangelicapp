@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useRealtimeEvent } from "@/hooks/use-realtime";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import { AsistenciasDialog } from "./asistencias-dialog";
+import { ConvocatoriaDialog } from "./convocatoria-dialog";
 import {
   ESTADO_PREDICADOR_CLASS,
   ESTADO_PREDICADOR_LABEL,
@@ -114,7 +114,7 @@ export function EventoDialog({
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const [asistenciasOpen, setAsistenciasOpen] = useState(false);
+  const [convocatoriaOpen, setConvocatoriaOpen] = useState(false);
   const [predicadores, setPredicadores] = useState<Predicador[]>([]);
 
   const form = useForm<EventoValues>({
@@ -323,11 +323,11 @@ export function EventoDialog({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setAsistenciasOpen(true)}
+                  onClick={() => setConvocatoriaOpen(true)}
                   className="flex items-center gap-1 rounded-full bg-sky-200/70 px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-200"
                 >
                   <Users className="h-3.5 w-3.5" />
-                  Ver asistencia
+                  Ver quién confirmó
                 </button>
               </div>
             )}
@@ -575,9 +575,9 @@ export function EventoDialog({
       </DialogContent>
 
       {evento && (
-        <AsistenciasDialog
-          open={asistenciasOpen}
-          onOpenChange={setAsistenciasOpen}
+        <ConvocatoriaDialog
+          open={convocatoriaOpen}
+          onOpenChange={setConvocatoriaOpen}
           eventoId={evento.id}
           eventoTitulo={evento.titulo}
         />

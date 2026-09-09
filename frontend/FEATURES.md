@@ -6,6 +6,47 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-08 — Estado de convocatoria (in-app + página pública) + UX de bloqueo de login
+
+**Por qué**: brief del backend en `frontend/prompt.md`. Backend ya implementado y desplegado en `staging` (migraciones `20260908203618_add_login_lockout` y `20260908204221_realtime_convocatoria_topic` aplicadas a `Backend-staging`; **prod todavía no**). Tres bloques.
+
+### Bloque A — Estado de convocatoria in-app (predicadores + integrantes juntos)
+
+`asistencias-dialog.tsx` mostraba solo integrantes. Ahora es una vista unificada de la convocatoria completa de un evento.
+
+- **`git mv asistencias-dialog.tsx → convocatoria-dialog.tsx`**, export `AsistenciasDialog → ConvocatoriaDialog`. Fetch de `GET /agenda/eventos/:id/asistencias` → `GET /agenda/eventos/:id/convocatoria` (`{ predicadores, asistencias }`).
+- **`src/components/agenda/types.ts`**: nuevo `ConvocatoriaResumen` (`{ predicadores: Predicador[]; asistencias: AsistenciaResumen[] }`).
+- Dos secciones: **"Predicadores invitados"** (lista plana con `nombre || email` + badge `ESTADO_PREDICADOR_*`; se oculta si no hay) y **"Convocatoria a la congregación"** (lo de antes, agrupado Confirmaron/Sin responder/Rechazaron). Título del diálogo → "Estado de la convocatoria — {evento}".
+- En vivo (mientras el diálogo está abierto para ese `eventoId`): `useRealtimeEvent("predicador:respondio", …)` parcha el predicador por `predicadorId`, y `useRealtimeEvent("asistencia:respondida", …)` el integrante por `integranteId`. Contadores derivados con `.filter`.
+- **`evento-dialog.tsx`**: import + `ConvocatoriaDialog`, state `asistenciasOpen → convocatoriaOpen`, botón "Ver asistencia" → **"Ver quién confirmó"**. Los badges de predicadores inline en modo edición + su `useRealtimeEvent("predicador:respondio")` **quedan como estaban** (el brief lo permite). Limitación conocida sin resolver (fuera de alcance del brief, que solo pidió renombrar): el botón que abre el diálogo sigue gateado a `evento.notificarIntegrantes`, así que un CULTO con predicadores pero sin convocatoria a la congregación no llega a esta vista rica (los badges inline sí se ven).
+
+### Bloque B — Página pública `/agenda/convocatoria/[token]`
+
+Link discreto que ya traen los correos de invitación (predicador y congregación). Cualquiera con un link de ese evento ve la lista de nombres y quién confirmó/rechazó — **decisión de producto explícita** ("que la gente pueda ver quién aceptó o rechazó"); no se exponen emails.
+
+- **`src/app/agenda/convocatoria/[token]/page.tsx`** (nueva, pública, fuera del app-shell): `GET /agenda/convocatoria/:token/estado` → `{ evento: {…, iglesia}, predicadores[], asistencias[] }` (sin emails). 404 → "Este enlace no es válido o el evento ya no está disponible.". Logo + iglesia, título/fecha/hora/lugar, ambas secciones agrupadas por estado con contadores. Card `max-w-md`, legible en celular (`sm:items-center`, en mobile queda arriba y scrollea).
+- **`src/hooks/use-convocatoria-realtime.ts`** (nuevo): `GET /agenda/convocatoria/:token/realtime` → `{ token, topic ("convocatoria:<eventoId>"), expiresInSeconds }`, `client.channel(topic, { config: { private: true }})` + `.on('broadcast', …)` para los dos eventos + renovación a `expiresInSeconds - 60`. **Cliente Supabase separado** del de `use-realtime.ts` — nueva instancia vía `createPublicRealtimeClient()`, porque los dos llaman `realtime.setAuth()` y se pisarían. 503 o cualquier fallo del token → `sinRealtime: true` → la página muestra un texto chico "Actualiza la página para ver los últimos cambios", sin loop en consola. Cleanup: `removeChannel` + `realtime.disconnect()` + `clearTimeout` al desmontar.
+- **`src/lib/supabase-realtime.ts`**: refactor — `makeClient()` privado compartido; `getSupabaseRealtimeClient()` (singleton de sesión, sin cambios de comportamiento) + `createPublicRealtimeClient()` (instancia nueva por-página).
+- **`src/components/layout/app-shell.tsx`**: `pathname.startsWith("/agenda/convocatoria/")` sumado a `ocultarShell`. **Fix incidental**: `/agenda/asistencia/` también estaba fuera de la lista aunque la entrada de su creación lo describe como "análoga a `predicacion/[token]`" (que sí está excluida) — se agregó, así el RSVP de integrantes tampoco muestra navbar/footer a un visitante sin sesión.
+
+### Bloque C — UX de bloqueo de login
+
+- **`src/app/login/page.tsx`**: en el `catch` del `onSubmit`, antes del error genérico, se maneja `403 { code: "CUENTA_BLOQUEADA", minutosRestantes }` (igual que ya se maneja `IGLESIA_SUSPENDIDA`): mensaje "Demasiados intentos fallidos. Prueba de nuevo en N minutos, o restablece tu contraseña." El link "¿Olvidaste tu contraseña?" ya está debajo del form y (según el backend) limpia el contador si aún no llegó a 5 intentos, por eso el texto lo menciona. Sin cuenta regresiva. El caso "cuenta desactivada a los 5 intentos" vuelve como 401 genérico → sin UX especial (lo resuelve un admin).
+
+### Fix del brief anterior aplicado acá
+
+- **`src/app/recuperar-contrasena/[token]/page.tsx`**: tras un reset exitoso ahora hace `setCsrfToken(null)` + `useAuthStore.getState().clearSession()` antes de redirigir a `/login?reset=ok`. Cubre el caso borde que quedó anotado en la entrada anterior (sesión vieja en `localStorage` con cookies ya muertas → rebote a `/` y 401). El brief anterior decía "no toques el auth-store"; el brief nuevo pide explícitamente este `clearSession()`, y es lo correcto (el backend cierra las sesiones server-side al resetear).
+
+**Pendiente / no hecho de la preamble del brief** (necesitan spec o son infra):
+- **"retry ante 403 de CSRF en `api.ts`"**: no se tocó. El brief que llegó a esta sesión no traía el detalle concreto y `api.ts` es la pieza sensible de auth (CLAUDE.md: no tocar sin confirmar contrato). La lógica de *preventive refresh* que ya existe cubre el escenario de "recarga → csrfToken perdido → request mutante" **si** el backend ya exentó `/auth/refresh` de CSRF (estaba "pendiente"). Falta confirmar con backend si hace falta algo más y con qué señal se distingue un 403 de CSRF de un 403 de permisos/`IGLESIA_SUSPENDIDA`/`CUENTA_BLOQUEADA`.
+- **`NEXT_IMAGES_UNOPTIMIZED=true` en Cloudflare**: infra (panel de Cloudflare), no código. Ya documentado como pendiente desde la entrada del 2026-08-25.
+
+**Verificación**: `npm run lint`, `npm run typecheck`, `npm run build` y `npm run cf:build` en limpio. **No se probó contra el backend real** — falta QA e2e: abrir el diálogo de convocatoria y ver predicadores + congregación con parcheo en vivo desde otro dispositivo; abrir `/agenda/convocatoria/<token>` real desde un mail y ver la lista + realtime; forzar 3 logins fallidos y ver el mensaje de bloqueo.
+
+`frontend/prompt.md` se vació — brief consumido.
+
+---
+
 ## 2026-09-08 — Recuperación de contraseña + asistencia en vivo + hint de predicador
 
 **Por qué**: brief del backend en `frontend/prompt.md`. El backend ya implementó y desplegó su parte en `staging` (Render + Supabase `Backend-staging`). Tres bloques independientes.
