@@ -15,19 +15,20 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 - **Proyecto Supabase de producción**: **`woerftoeqarupnrggupl` = "evangelicapp-prod"** (confirmado por el fundador). El `lkcgiqmgdefhxhckedga` que estaba en `.env.example` y como fallback hardcodeado en `next.config.ts` quedó **obsoleto** — se corrigió en ambos.
 - **Worker `evangelicapp`**: ya tiene las 3 `NEXT_PUBLIC_*` en **valores de producción** (backend `evangelicapp-backend.onrender.com` + Supabase `evangelicapp-prod`). O sea, el Worker de "staging" ya corre el stack de producción completo — solo le falta el dominio lindo y confirmar el login.
 - **Backend (Render)**: responde; su CORS ya permite `https://evangelicapp.rojascofrem.workers.dev` con `credentials: true`. **NO** permite todavía `https://app.evangelicapp.cl` (falta agregarlo a `CORS_ORIGIN`).
-- No se pudo verificar el atributo `SameSite` de las cookies de sesión sin un login real. El hecho de que el CORS liste explícitamente el origin de `workers.dev` sugiere que el backend usa `SameSite=None` (si fuera `Lax` no tendría sentido cross-site), pero hay que confirmarlo con un login real.
+- **Cookies cross-site**: el fundador confirmó que viene usando la app autenticada en `evangelicapp.rojascofrem.workers.dev` (dominio distinto al backend) desde hace semanas → el backend setea las cookies de sesión con **`SameSite=None; Secure`** en prod, no `Lax` como dice `docs/auth-cookies.md` (tabla desactualizada, se anotó). **No hace falta** poner el backend bajo `evangelicapp.cl` para que el login ande; `api.evangelicapp.cl` queda como prolijidad opcional.
 
 **Qué cambió en el repo**:
 - **`next.config.ts`**: el fallback del hostname de Supabase Storage pasó de `lkcgiqmgdefhxhckedga` a `woerftoeqarupnrggupl` (el proyecto de prod real).
 - **`.env.example`**: `NEXT_PUBLIC_SUPABASE_URL` corregido a `woerftoeqarupnrggupl`.
-- **`frontend/docs/deploy-produccion.md`**: reescrito y **acortado**. Ahora refleja el estado real: DNS listo, Worker con vars de prod, y solo 3 pasos pendientes (dominio `app.evangelicapp.cl` en el Worker vía dashboard; `CORS_ORIGIN` del backend; QA de login). Paso 4 (`api.evangelicapp.cl`) queda como opcional / obligatorio-si-el-login-falla.
+- **`frontend/docs/deploy-produccion.md`**: reescrito y **acortado**. Ahora refleja el estado real: DNS listo, Worker con vars de prod, login cross-site ya funcionando. Quedan **2 pasos** (dominio `app.evangelicapp.cl` en el Worker vía dashboard; `https://app.evangelicapp.cl` en `CORS_ORIGIN` del backend) + QA. `api.evangelicapp.cl` es opcional sin apuro.
+- **`docs/auth-cookies.md`**: la sección "Topología de producción" corregida — cookies de prod son `SameSite=None`, no `Lax`; y se anotó que la nota de "csrf_token se lee de document.cookie" también está desactualizada (va por el body → memoria).
 
 **Pendiente (infra, no código)**:
 1. Agregar `app.evangelicapp.cl` como Custom Domain del Worker `evangelicapp` (Cloudflare dashboard).
 2. Agregar `https://app.evangelicapp.cl` a `CORS_ORIGIN` del backend (Render).
-3. QA de login sobre `app.evangelicapp.cl`. Si falla por cookies cross-site → Paso 4 (`api.evangelicapp.cl`, mismo dominio raíz).
+3. QA sobre `app.evangelicapp.cl` (mismo stack que ya se usa en la URL fea).
 4. Backend prod al día: confirmar que Render prod tiene los cambios que el frontend de `staging` asume + migraciones aplicadas a `evangelicapp-prod`.
-5. (Más adelante) merge `staging → main`; separar un entorno de staging real.
+5. (Más adelante) merge `staging → main`; separar un entorno de staging real; opcionalmente `api.evangelicapp.cl`.
 
 ---
 

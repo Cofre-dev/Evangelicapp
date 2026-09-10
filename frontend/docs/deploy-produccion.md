@@ -22,16 +22,22 @@ Está más avanzado de lo que parecía:
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_...` (de ese proyecto)
 - ✅ **Backend (Render) responde** y su CORS ya permite
   `https://evangelicapp.rojascofrem.workers.dev` con `credentials: true`.
+- ✅ **Login cross-site confirmado**: el fundador viene usando la app autenticada
+  (finanzas, agenda, etc.) en `evangelicapp.rojascofrem.workers.dev` desde hace
+  semanas. Como esa URL y el backend en `onrender.com` son dominios distintos,
+  eso implica que el backend setea las cookies de sesión con **`SameSite=None;
+  Secure`** (no `Lax`, como dice la tabla vieja de `docs/auth-cookies.md`).
+  → No hace falta poner el backend bajo `evangelicapp.cl` para que el login ande.
 - ❌ **Falta**: dominio `app.evangelicapp.cl` en el Worker · CORS del backend para
-  ese dominio · (opcional) `api.evangelicapp.cl` · QA de login sobre el Worker.
+  ese dominio.
 
 En la práctica, el Worker de "staging" **ya corre el stack de producción
-completo** (backend prod + Supabase prod), solo que en una URL fea y sin haber
-confirmado que el login funciona ahí.
+completo y probado** (backend prod + Supabase prod + auth funcionando), solo que
+en una URL fea.
 
 ---
 
-## Lo que falta — 3 pasos
+## Lo que falta — 2 pasos + probar
 
 ### Paso 1 — Dominio `app.evangelicapp.cl` en el Worker (Cloudflare, ~5 min)
 
@@ -55,11 +61,12 @@ confirmado que el login funciona ahí.
   ```
   Tiene que devolver `access-control-allow-origin: https://app.evangelicapp.cl`.
 
-### Paso 3 — QA de login sobre `app.evangelicapp.cl`
+### Probar — QA de login sobre `app.evangelicapp.cl`
 
-Entrar con un usuario real y confirmar:
+Entrar con un usuario real y confirmar (es el mismo stack que ya venís usando en
+la URL fea, así que debería andar igual):
 
-- [ ] Login → entra al panel (las cookies de sesión se setean y viajan).
+- [ ] Login → entra al panel.
 - [ ] Navegar a Finanzas y que cargue (GET autenticado funciona).
 - [ ] Crear/editar un registro (mutación con CSRF).
 - [ ] Abrir 2 pestañas, dejar la sesión un rato, navegar → ninguna se desloguea.
@@ -71,32 +78,27 @@ Entrar con un usuario real y confirmar:
 - [ ] `/cuenta-suspendida` y `/facturacion` muestran `contacto@evangelicapp.cl`.
 - [ ] Un correo real llega (reset de contraseña — requiere Resend en Render).
 
-**Si el login NO funciona** (entra pero después todo da error de sesión): es el
-tema de las cookies cross-site. `app.evangelicapp.cl` (Cloudflare) y
-`evangelicapp-backend.onrender.com` (Render) son dominios distintos; si el backend
-setea las cookies con `SameSite=Lax`, no viajan en los `fetch`. Solución: hacer el
-**Paso 4** (mover el backend a `api.evangelicapp.cl`, mismo dominio raíz) **o** que
-el backend cambie las cookies a `SameSite=None; Secure`.
+Con eso, **estás en producción en `app.evangelicapp.cl`**.
 
 ---
 
-## Paso 4 (opcional, o obligatorio si el Paso 3 falla) — `api.evangelicapp.cl`
+## Opcional, sin apuro — `api.evangelicapp.cl`
 
-Poner el backend bajo el mismo dominio raíz que la app: así las cookies
-`SameSite=Lax` viajan sin que el backend cambie nada (mismo `evangelicapp.cl` =
-same-site). Detalle del porqué en `docs/auth-cookies.md`.
+Hoy el frontend habla con `evangelicapp-backend.onrender.com` y funciona (cookies
+`SameSite=None`). Pasar el backend a `api.evangelicapp.cl` es solo prolijidad
+(marca, no quedar atado al dominio de Render, y defensa en profundidad por si algún
+día el backend deja de usar `SameSite=None`). Cuando quieras:
 
-1. Render → servicio del backend → **Settings** → **Custom Domains** → agregar
-   `api.evangelicapp.cl`. Render da un target (`<algo>.onrender.com`).
-2. Cloudflare → DNS de `evangelicapp.cl` → **Add record**:
-   - Tipo `CNAME`, nombre `api`, target el de Render, **Proxy status: DNS only**
-     (nube gris — no proxear la API).
+1. Render → backend → **Settings** → **Custom Domains** → agregar
+   `api.evangelicapp.cl`. Render da un target.
+2. Cloudflare → DNS de `evangelicapp.cl` → **Add record**: `CNAME`, nombre `api`,
+   target el de Render, **Proxy status: DNS only** (nube gris).
 3. Esperar el certificado en Render.
-4. Cloudflare → Worker `evangelicapp` → Settings → Build → Variables →
+4. Cloudflare → Worker → Settings → Build → Variables →
    `NEXT_PUBLIC_API_URL` = `https://api.evangelicapp.cl` → **Retry deployment**.
-5. Render → `CORS_ORIGIN` → asegurarse de que `https://app.evangelicapp.cl` está
-   (el de `onrender.com` ya se puede sacar).
-6. Repetir el QA del Paso 3.
+5. Render → `CORS_ORIGIN` → dejar `https://app.evangelicapp.cl` (sacar el de
+   `onrender.com` si querés).
+6. Repetir el QA.
 
 ---
 

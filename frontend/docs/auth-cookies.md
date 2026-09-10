@@ -52,11 +52,14 @@ Por qué double-submit y no solo `SameSite=Lax`: `Lax` ya bloquea el CSRF clási
 
 ## Topología de producción (dominios)
 
-`app.evangelicapp.cl` (frontend, Cloudflare Workers) y `api.evangelicapp.cl` (backend, Render) comparten el dominio registrable `evangelicapp.cl` → las requests de `apiFetch` son **same-site**, así que las cookies `SameSite=Lax` viajan en cada `fetch` sin necesidad de `SameSite=None` ni de fijar `Domain`. La cookie sigue siendo host-only sobre `api.evangelicapp.cl` (el navegador la manda a ese host la inicie quien la inicie, mientras `Lax` lo permita — y `Lax` permite same-site).
+- **Frontend**: `app.evangelicapp.cl` — Cloudflare Workers (`@opennextjs/cloudflare`).
+- **Backend**: hoy `evangelicapp-backend.onrender.com` (Render). Opcionalmente `api.evangelicapp.cl` más adelante (ver `deploy-produccion.md`).
 
-`csrf_token` **no** se comparte por subdominio: el JS de `app.` no puede leer una cookie host-only de `api.`. Por eso el backend manda el valor en el body de `/auth/login` y `/auth/refresh` y `src/lib/api.ts` lo guarda en memoria (`csrfToken`), no lo lee de `document.cookie`.
+**El frontend y el backend están en dominios distintos** (cross-site). El login y todo `apiFetch` autenticado **funcionan así desde hace semanas** en `evangelicapp.rojascofrem.workers.dev` → en producción el backend setea las cookies de sesión con **`SameSite=None; Secure`**, no `Lax`. (La tabla de "Cookies" más arriba describe la config con la que se implementó el esquema en 2026-07; el valor efectivo en prod es `None`. Confirmar y actualizar la tabla con backend.)
 
-Requisito de infra: `CORS_ORIGIN` del backend debe listar `https://app.evangelicapp.cl` explícitamente (sin wildcard — `credentials: true` no lo admite). Checklist completo en [`deploy-produccion.md`](./deploy-produccion.md).
+`csrf_token`: el JS del frontend no puede leer una cookie host-only de otro dominio, así que el backend manda el valor en el body de `/auth/login` y `/auth/refresh` y `src/lib/api.ts` lo guarda en memoria (`csrfToken`) — **no** lo lee de `document.cookie` (contra lo que dice la nota de la sección "Cookies", también desactualizada).
+
+Requisito de infra: `CORS_ORIGIN` del backend debe listar el origin del frontend (`https://app.evangelicapp.cl`, y `https://evangelicapp.rojascofrem.workers.dev` mientras se use) explícitamente — sin wildcard, `credentials: true` no lo admite. Checklist completo en [`deploy-produccion.md`](./deploy-produccion.md).
 
 ## Rotación de refresh token y condición de carrera entre tabs
 
