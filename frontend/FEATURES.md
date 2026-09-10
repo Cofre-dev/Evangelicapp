@@ -6,6 +6,29 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-09 — Hosting de producción: Cloudflare Workers (no Vercel) + next.config.ts env-driven para Supabase
+
+**Por qué**: seguimiento de la entrada de abajo. Al evaluar el costo (Vercel Pro ~USD 20/mes para uso comercial, encima de Render Pro + Supabase Pro ya contratados) y que el Worker de Cloudflare ya está cableado, se decidió hostear producción en **Cloudflare Workers**, no en Vercel. El repo ya tenía `@opennextjs/cloudflare` + `wrangler.jsonc` + Workers Builds; lo que era "target de staging" pasa a ser el camino de producción.
+
+**Inspección del estado real del Worker** (vía MCP de Cloudflare, solo lectura):
+- Worker `evangelicapp` (`evangelicapp.rojascofrem.workers.dev`), Workers Builds conectado al repo, rama de producción = `staging`. Build `npm run cf:build`, deploy `npx wrangler deploy`, Node 20.20.2.
+- **Las 3 variables `NEXT_PUBLIC_*` ya están seteadas** en el panel de Builds — el bug de 2026-08-25 (variable en el panel equivocado) está resuelto. Valores actuales = staging: API `evangelicapp-backend.onrender.com`, Supabase `woerftoeqarupnrggupl.supabase.co` (proyecto **Backend-staging**, distinto del de `.env.example`), anon key `sb_publishable_...`.
+- Sin custom domain / routes — solo el `*.workers.dev`. Builds pasan limpios.
+- **Hallazgo**: hay dos proyectos Supabase (`woerftoeqarupnrggupl` staging, `lkcgiqmgdefhxhckedga` el de `.env.example`/`next.config.ts`, presumiblemente prod). Hay que confirmar cuál es producción antes de setear variables.
+
+**Qué cambió en el repo**:
+- **`next.config.ts`**: el hostname de Supabase Storage en `images.remotePatterns` pasó de estar hardcodeado (`lkcgiqmgdefhxhckedga.supabase.co`) a derivarse de `NEXT_PUBLIC_SUPABASE_URL` (con fallback al valor viejo para builds locales/CI sin la variable). **Era un bug real**: en staging, que usa otro proyecto Supabase, cualquier `<Image>` apuntando a `woerftoeqarupnrggupl.supabase.co/storage/...` fallaba porque ese hostname no estaba permitido. Ahora "cambiar de entorno = cambiar la variable", igual que ya pasa con el backend.
+- **`frontend/docs/deploy-produccion.md`**: reescrito para el camino Cloudflare. Incluye el estado real inspeccionado del Worker, la decisión "1 Worker vs 2" (recomendado 2: `evangelicapp-prod` nuevo + `evangelicapp` sigue de staging), pasos de DNS (delegar `evangelicapp.cl` a Cloudflare replicando primero los registros de la landing y el correo), variables en el panel de Build, custom domain, y `NEXT_IMAGES_UNOPTIMIZED=true` como salida recomendada para los logos. Vercel queda como §10 (alternativa por costo).
+- **`README.md`**, **`wrangler.jsonc`** (comentario), **`.env.example`**, **`docs/auth-cookies.md`**: actualizados de "Vercel = prod / Cloudflare = staging" a "Cloudflare Workers = hosting". `.env.example` documenta que hay proyectos Supabase distintos por entorno.
+
+**Qué NO se tocó**: `src/lib/api.ts`, `src/stores/auth-store.ts`. Tampoco `wrangler.jsonc` en su config real (solo el comentario) — agregar `routes`/`custom_domain` antes de que la zona esté en Cloudflare hace fallar el deploy; se hace desde el dashboard (checklist §5).
+
+**Verificación**: `npm run lint`, `npm run typecheck`, `npm run build` (con y sin `NEXT_PUBLIC_SUPABASE_URL`) y `npm run cf:build` pasan limpios.
+
+**Pendiente (infra, en `docs/deploy-produccion.md`)**: delegar DNS a Cloudflare, confirmar proyecto Supabase de prod + plan Pro, backend a Render prod + migraciones + `CORS_ORIGIN`, decidir 1 vs 2 Workers y setear variables de prod + custom domain, QA sobre el Worker real, cutover.
+
+---
+
 ## 2026-09-09 — Preparación para puesta en producción (dominio evangelicapp.cl)
 
 **Por qué**: se compró `evangelicapp.cl` (nic.cl), la landing ya está andando en el apex/`www`, y se contrató Supabase Pro + Render Pro para llevar la app a producción. Esta sesión prepara **el repo** para ese deploy; la infra en sí (Vercel, Render, Supabase, DNS) y el merge `staging → main` quedan pendientes y guiados por el checklist nuevo.

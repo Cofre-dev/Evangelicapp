@@ -1,14 +1,17 @@
 {
 	// Config de despliegue a Cloudflare Workers vía @opennextjs/cloudflare.
-	// Target de STAGING/QA — no reemplaza el deploy de producción en Vercel
-	// (ver frontend/FEATURES.md, entrada de esta fecha, para el detalle).
+	// Cloudflare Workers es el hosting elegido para producción (no Vercel) —
+	// plan completo en frontend/docs/deploy-produccion.md.
 	//
-	// El name tiene que coincidir con el Worker "evangelicapp" que ya existe
-	// en la cuenta de Cloudflare (se creó solo al conectar el repo vía
-	// Workers Builds, antes de que este archivo existiera). Si no coinciden,
-	// wrangler deploy tira el warning "Failed to match Worker name" y
-	// Cloudflare intenta abrir un PR para "corregirlo" -- se evita fijándolo
-	// igual acá.
+	// El name tiene que coincidir con el Worker que Workers Builds construye
+	// (hoy "evangelicapp", que sirve la rama `staging` en
+	// evangelicapp.rojascofrem.workers.dev). Si no coinciden, `wrangler deploy`
+	// tira "Failed to match Worker name" e intenta abrir un PR para "corregirlo".
+	//
+	// Custom domain (app.evangelicapp.cl) y separación staging/producción: NO se
+	// configuran acá todavía. Agregar `routes`/`custom_domain` antes de que la
+	// zona evangelicapp.cl esté en la cuenta de Cloudflare hace fallar el deploy.
+	// Se hace desde el dashboard una vez que el DNS está delegado (checklist §5).
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "evangelicapp",
 	"main": ".open-next/worker.js",

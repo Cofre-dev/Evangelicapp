@@ -52,7 +52,7 @@ Por qué double-submit y no solo `SameSite=Lax`: `Lax` ya bloquea el CSRF clási
 
 ## Topología de producción (dominios)
 
-`app.evangelicapp.cl` (frontend, Vercel) y `api.evangelicapp.cl` (backend, Render) comparten el dominio registrable `evangelicapp.cl` → las requests de `apiFetch` son **same-site**, así que las cookies `SameSite=Lax` viajan en cada `fetch` sin necesidad de `SameSite=None` ni de fijar `Domain`. La cookie sigue siendo host-only sobre `api.evangelicapp.cl` (el navegador la manda a ese host la inicie quien la inicie, mientras `Lax` lo permita — y `Lax` permite same-site).
+`app.evangelicapp.cl` (frontend, Cloudflare Workers) y `api.evangelicapp.cl` (backend, Render) comparten el dominio registrable `evangelicapp.cl` → las requests de `apiFetch` son **same-site**, así que las cookies `SameSite=Lax` viajan en cada `fetch` sin necesidad de `SameSite=None` ni de fijar `Domain`. La cookie sigue siendo host-only sobre `api.evangelicapp.cl` (el navegador la manda a ese host la inicie quien la inicie, mientras `Lax` lo permita — y `Lax` permite same-site).
 
 `csrf_token` **no** se comparte por subdominio: el JS de `app.` no puede leer una cookie host-only de `api.`. Por eso el backend manda el valor en el body de `/auth/login` y `/auth/refresh` y `src/lib/api.ts` lo guarda en memoria (`csrfToken`), no lo lee de `document.cookie`.
 

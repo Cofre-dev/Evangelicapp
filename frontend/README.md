@@ -48,9 +48,10 @@ Las `NEXT_PUBLIC_*` se hornean en el build — cambiarlas exige un redeploy, no 
 
 ## Deploy
 
-- **Producción**: este frontend se despliega en **Vercel** (rama `main`, root directory `frontend/`) en `app.evangelicapp.cl`. El backend va aparte en **Render** (`api.evangelicapp.cl`); ambos bajo el mismo dominio raíz a propósito, para que las cookies de sesión `SameSite=Lax` viajen en los `fetch` sin cambios de backend.
-- **Staging/QA**: **Cloudflare Workers** vía `@opennextjs/cloudflare` (rama `staging`, scripts `cf:*`, `wrangler.jsonc`).
-- Checklist completo de puesta en producción (DNS, variables, Supabase, CORS, orden de cutover, smoke test, rollback): [`docs/deploy-produccion.md`](./docs/deploy-produccion.md).
+- **Hosting**: **Cloudflare Workers** vía `@opennextjs/cloudflare` (`wrangler.jsonc`, `open-next.config.ts`, scripts `cf:*`), con Workers Builds construyendo el repo en cada push. El backend va aparte en **Render** (`api.evangelicapp.cl`); frontend (`app.evangelicapp.cl`) y backend van bajo el mismo dominio raíz a propósito, para que las cookies de sesión `SameSite=Lax` viajen en los `fetch` sin cambios de backend.
+- Hoy el Worker `evangelicapp` construye la rama `staging` (`evangelicapp.rojascofrem.workers.dev`). La separación staging/producción y el custom domain se resuelven en el checklist.
+- Checklist completo de puesta en producción (DNS a Cloudflare, variables, Supabase, CORS, Workers, orden de cutover, smoke test, rollback): [`docs/deploy-produccion.md`](./docs/deploy-produccion.md).
+- Alternativa evaluada y descartada por costo: Vercel (ver §10 del checklist).
 
 ## Estructura del proyecto
 

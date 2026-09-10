@@ -1,10 +1,12 @@
 # Puesta en producción — checklist
 
-Guía para llevar **este repo (frontend)** a producción en `app.evangelicapp.cl`.
-Complementa a `README.md` (setup) y `FEATURES.md` (bitácora). Marcá cada `[ ]` a
-medida que lo completás.
+Guía para llevar **este repo (frontend)** a producción en `app.evangelicapp.cl`,
+hospedado en **Cloudflare Workers**. Complementa a `README.md` (setup) y
+`FEATURES.md` (bitácora). Marcá cada `[ ]` a medida que lo completás.
 
-> Última revisión del checklist: 2026-09-09.
+> Última revisión: 2026-09-09. Decisión: hosting en **Cloudflare Workers** (no
+> Vercel) — ya está cableado como staging, sale gratis a esta escala y consolida
+> todo en una cuenta. Ver §10 para la alternativa Vercel.
 
 ---
 
@@ -13,165 +15,188 @@ medida que lo completás.
 | Pieza | Repo | Hosting | Dominio |
 |---|---|---|---|
 | Landing / sitio de marketing | (otro) | (ya andando) | `evangelicapp.cl` + `www.evangelicapp.cl` |
-| **App (este repo, frontend)** | este | **Vercel** | **`app.evangelicapp.cl`** |
+| **App (este repo, frontend)** | este | **Cloudflare Workers** (`@opennextjs/cloudflare`) | **`app.evangelicapp.cl`** |
 | Backend (NestJS + Prisma) | separado | **Render** | **`api.evangelicapp.cl`** |
-| Base de datos + Realtime + Storage | — | **Supabase** (proyecto "Backend", plan Pro) | `lkcgiqmgdefhxhckedga.supabase.co` |
+| Base de datos + Realtime + Storage | — | **Supabase** (plan Pro) | ver §3 |
 
 **Supabase Pro y Render Pro no son de este repo**: Render Pro hostea el backend,
 Supabase Pro es la BD/Realtime/Storage que consumen los dos. Este repo solo
-necesita la URL del backend y las dos variables públicas de Supabase.
+necesita 3 variables `NEXT_PUBLIC_*`.
 
 ### Por qué `app.` + `api.` bajo el mismo dominio raíz
 
 Las cookies de sesión (`docs/auth-cookies.md`) son `httpOnly`, `Secure` en prod,
 **`SameSite=Lax`** y host-only (sin `Domain`). Con `app.evangelicapp.cl` y
-`api.evangelicapp.cl` bajo el mismo dominio registrable (`evangelicapp.cl`), las
-requests de `apiFetch` son **same-site** → el navegador manda las cookies en cada
-`fetch` sin que el backend cambie nada.
+`api.evangelicapp.cl` bajo `evangelicapp.cl`, las requests de `apiFetch` son
+**same-site** → el navegador manda las cookies en cada `fetch` sin que el backend
+cambie nada. Si el frontend quedara en `*.workers.dev` y el backend en
+`*.onrender.com` (cross-site), `SameSite=Lax` **no** manda las cookies en los
+`fetch` → el login "entra" pero nada autenticado funciona después. Por eso el
+custom domain **no es opcional**.
 
-Si el frontend quedara en `*.vercel.app` y el backend en `*.onrender.com` (dominios
-distintos = *cross-site*), `SameSite=Lax` **no** manda las cookies en los `fetch`
-→ el login "entra" pero ninguna request autenticada después funciona. Por eso el
-custom domain de la app **no es opcional** para producción.
+---
 
-El `csrf_token` sigue viajando en el body de `/auth/login` y `/auth/refresh` (no
-por cookie legible) porque el JS de `app.evangelicapp.cl` igual no puede leer una
-cookie host-only de `api.evangelicapp.cl` — eso no cambia con los subdominios.
-Ver `src/lib/api.ts` (`csrfToken` en memoria).
+## Estado actual (inspeccionado 2026-09-09 vía MCP de Cloudflare)
+
+- Worker **`evangelicapp`** (`evangelicapp.rojascofrem.workers.dev`), conectado
+  al repo vía **Workers Builds**, rama de producción = **`staging`**.
+  Build: `npm run cf:build` · Deploy: `npx wrangler deploy` · Node 20.20.2.
+- **Las 3 variables `NEXT_PUBLIC_*` YA están seteadas** en el panel de Builds
+  (el bug de 2026-08-25 está resuelto). Valores actuales = **staging**:
+  - `NEXT_PUBLIC_API_URL` = `https://evangelicapp-backend.onrender.com`
+  - `NEXT_PUBLIC_SUPABASE_URL` = `https://woerftoeqarupnrggupl.supabase.co` (proyecto **Backend-staging**)
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_...` (de ese proyecto)
+- **Sin custom domain / routes** — solo el `*.workers.dev`.
+- Builds pasan limpios; deploy OK.
+
+> ⚠️ Hay **dos proyectos Supabase**: `woerftoeqarupnrggupl` (Backend-staging, lo
+> que usa el Worker hoy) y `lkcgiqmgdefhxhckedga` (el que está en `.env.example`
+> y era el fallback hardcodeado de `next.config.ts` — presumiblemente el de
+> producción). **Confirmá cuál es producción** antes de setear variables (§3).
 
 ---
 
 ## 1. Repo — cambios de código (esta sesión)
 
-- [x] `frontend/docs/deploy-produccion.md` — este documento.
-- [x] Correo de soporte: `contacto@evangelic.app` → `contacto@evangelicapp.cl`
-      en `cuenta-suspendida`, `facturacion`, `finanzas/departamentos`,
-      `politica-privacidad`.
-- [x] `.env.example` — `NEXT_PUBLIC_API_URL` vuelve a `http://localhost:3001` por
-      defecto (valor de dev); prod documentado como comentario.
-- [x] `README.md` — sección "Deploy" apuntando acá.
+- [x] `frontend/docs/deploy-produccion.md` — este documento (reescrito para Cloudflare).
+- [x] Correo de soporte `contacto@evangelic.app` → `contacto@evangelicapp.cl` (4 archivos).
+- [x] `.env.example` — `NEXT_PUBLIC_API_URL` vuelve a `http://localhost:3001` por defecto.
+- [x] `README.md` — sección "Deploy".
 - [x] `docs/auth-cookies.md` — nota de topología de producción.
-- [x] `npm run lint && npm run typecheck && npm run build` en limpio (2026-09-09).
-- [ ] Commit en `staging` (no mergear a `main` todavía — ver §7).
+- [x] `next.config.ts` — el hostname de Supabase Storage se deriva de
+      `NEXT_PUBLIC_SUPABASE_URL` (antes hardcodeado a `lkcgiqmgdefhxhckedga`;
+      rompía la carga de imágenes en staging, que usa otro proyecto).
+- [x] `npm run lint && typecheck && build` en limpio.
 
-> **No se toca** `src/lib/api.ts` ni `src/stores/auth-store.ts` (CLAUDE.md: no
-> modificar auth sin confirmar contrato con backend). El esquema actual ya
-> soporta la topología `app.` + `api.` sin cambios.
-
----
-
-## 2. Supabase (proyecto "Backend", plan Pro)
-
-- [ ] Confirmar que el plan **Pro** está activo en el proyecto correcto
-      (`lkcgiqmgdefhxhckedga` — el ref que está hardcodeado en `next.config.ts`
-      para `images.remotePatterns` y en `.env.example`).
-      **Si producción usa un proyecto Supabase nuevo/distinto**, hay que cambiar
-      además el hostname hardcodeado en `frontend/next.config.ts` (línea del
-      `remotePatterns` de `*.supabase.co`), no solo la variable de entorno.
-- [ ] Copiar la **anon / publishable key**: Dashboard → proyecto "Backend" →
-      Project Settings → API → `anon` `public`. Va a Vercel (§4), no se commitea.
-- [ ] Storage: el bucket público de logos/fotos sigue **público**
-      (`/storage/v1/object/public/**`) — `next.config.ts` lo espera así.
-- [ ] Realtime habilitado + **RLS sobre `realtime.messages` aplicada** (migración
-      del backend). Sin esto, `GET /realtime/token` responde 503 y la app corre
-      en modo "sin realtime" (no rompe, pero no hay tiempo real). — *coordinación
-      con repo backend.*
+> **No se toca** `src/lib/api.ts` ni `src/stores/auth-store.ts` (CLAUDE.md).
 
 ---
 
-## 3. Backend en Render (coordinación con el repo del backend)
+## 2. DNS — `evangelicapp.cl` a Cloudflare
+
+- [ ] En el dashboard de Cloudflare: **Add a site** → `evangelicapp.cl` → plan Free.
+- [ ] Cloudflare escanea los registros actuales. **Revisá que haya importado
+      TODO lo de la landing y el correo** antes de seguir:
+  - [ ] registros de la landing (apex `evangelicapp.cl`, `www`)
+  - [ ] `MX` y cualquier `TXT` de correo (SPF/DKIM/DMARC) si tenés buzones
+  - Lo que falte, agregalo a mano ahora — si cambiás los nameservers sin esto,
+    se cae la web y el mail.
+- [ ] En **nic.cl** → cambiar los nameservers del dominio a los 2 que da
+      Cloudflare (`x.ns.cloudflare.com`).
+- [ ] Esperar a que Cloudflare marque la zona como **Active** (minutos a horas).
+- [ ] Registros nuevos (se agregan en §4 y §5, no ahora):
+  - `api.evangelicapp.cl` → CNAME al target de Render (**DNS only**, nube gris)
+  - `app.evangelicapp.cl` → lo crea Cloudflare solo al agregar el custom domain
+    al Worker (§5)
+
+---
+
+## 3. Supabase (plan Pro)
+
+- [ ] **Confirmar cuál proyecto es producción**: `lkcgiqmgdefhxhckedga` o uno
+      nuevo. (Backend-staging = `woerftoeqarupnrggupl`, no tocar como prod.)
+- [ ] Plan **Pro** activo en el proyecto de producción.
+- [ ] Copiar de ese proyecto → Project Settings → API:
+  - `Project URL` → para `NEXT_PUBLIC_SUPABASE_URL`
+  - `anon` / `publishable` key → para `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+      (no es secreta, pero no se commitea)
+- [ ] Storage: bucket de logos/fotos **público** (`/storage/v1/object/public/**`).
+- [ ] Realtime habilitado + **RLS sobre `realtime.messages`** aplicada al
+      proyecto de prod (migración del backend). Sin esto la app corre en modo
+      "sin realtime" (no rompe). — *coordinación con repo backend.*
+- [ ] `next.config.ts` ya no hardcodea el hostname — pero si el proyecto de prod
+      NO es `lkcgiqmgdefhxhckedga`, revisá que el fallback de ese archivo (para
+      builds locales sin la variable) no confunda a nadie.
+
+---
+
+## 4. Backend en Render (coordinación con el repo del backend)
 
 El frontend de `staging` ya asume cambios de backend que **todavía no están en
-producción** (migración de Realtime a Supabase Broadcast, bloqueo de login,
-estado de convocatoria, recuperación de contraseña). Antes del cutover (§7):
+producción** (Realtime a Supabase Broadcast, bloqueo de login, convocatoria,
+recuperación de contraseña). Antes del cutover (§7):
 
-- [ ] Deploy a Render **prod** de los cambios de backend equivalentes a lo que
-      consume `staging`.
-- [ ] Migraciones aplicadas a la **Supabase de producción** (incluidas
-      `add_login_lockout`, `realtime_convocatoria_topic`, RLS de
-      `realtime.messages`).
+- [ ] Deploy a Render **prod** de los cambios equivalentes a lo que consume `staging`.
+- [ ] Migraciones aplicadas a la **Supabase de producción** (`add_login_lockout`,
+      `realtime_convocatoria_topic`, RLS de `realtime.messages`).
 - [ ] Variables de entorno en Render (prod):
-  - [ ] `CORS_ORIGIN` incluye `https://app.evangelicapp.cl`
-        (separado por coma, **sin wildcard** — `credentials: true` no admite `*`).
-  - [ ] `SUPABASE_JWT_SECRET` seteado (para `GET /realtime/token`).
+  - [ ] `CORS_ORIGIN` incluye `https://app.evangelicapp.cl` (coma-separado, **sin
+        wildcard** — `credentials: true` no admite `*`).
+  - [ ] `SUPABASE_JWT_SECRET` del **mismo proyecto Supabase** que usa el frontend
+        de prod (si no coinciden, `GET /realtime/token` emite un JWT que Supabase
+        rechaza y no hay realtime).
   - [ ] `MAIL_PROVIDER=resend`, `RESEND_API_KEY=re_...`,
         `MAIL_FROM="EvangelicApp <no-reply@evangelicapp.cl>"`.
-- [ ] Custom domain **`api.evangelicapp.cl`** agregado al servicio de Render, con
-      cert HTTPS emitido.
-- [ ] Confirmar con backend que las cookies de sesión salen `SameSite=Lax` (no
-      `Strict`) y `Secure` en prod.
-- [ ] DNS de Resend (SPF/DKIM) sobre `evangelicapp.cl` para que los correos
-      transaccionales no caigan a spam.
+- [ ] Custom domain **`api.evangelicapp.cl`** en Render → copiar el target CNAME
+      que da Render → crearlo en Cloudflare DNS como **DNS only** (nube gris).
+- [ ] Verificar cert HTTPS emitido en `api.evangelicapp.cl`.
+- [ ] Confirmar con backend que las cookies salen `SameSite=Lax` y `Secure` en prod.
+- [ ] DNS de Resend (SPF/DKIM/DMARC) — agregar en Cloudflare DNS.
 
 ---
 
-## 4. Vercel — proyecto del frontend
+## 5. Cloudflare Workers — configurar producción
 
-- [ ] Proyecto de Vercel conectado al repo de GitHub.
-- [ ] **Settings → General → Root Directory = `frontend`** (el código no está en
-      la raíz del repo).
-- [ ] Framework Preset: **Next.js** (autodetecta). Build / Install / Output: por
-      defecto.
-- [ ] **Settings → General → Node.js Version = `20.x`** (matchea `.nvmrc` y
-      `engines.node` de `package.json`; CI también corre en 20).
-- [ ] **Settings → Git → Production Branch = `main`**.
-- [ ] **Settings → Environment Variables** (scope **Production**):
+**Decisión previa**: ¿un Worker o dos?
+
+- **Opción A (1 Worker, simple)**: `evangelicapp` pasa a ser producción. Se le
+  cambian las variables a valores de prod y se le agrega el custom domain. Se
+  pierde el entorno de staging aislado (la QA futura va por `npm run cf:preview`
+  local o un preview deployment).
+- **Opción B (2 Workers, recomendada)**: se crea un Worker nuevo
+  `evangelicapp-prod` conectado al repo por Workers Builds; `evangelicapp` sigue
+  siendo staging. Cada uno con sus propias variables y su rama.
+  - Transición: mientras `main` esté desactualizado, conectá `evangelicapp-prod`
+    también a la rama `staging` (mismo código, distinta config). Cuando hagas el
+    merge a `main`, cambiá la rama de producción de ese Worker a `main`.
+
+Pasos (para el Worker que vaya a ser producción):
+
+- [ ] **Variables** — Worker → Settings → **Build** → Variables and Secrets
+      (⚠️ el panel de *Build*, no el de runtime), scope **Production**:
 
   | Variable | Valor |
   |---|---|
   | `NEXT_PUBLIC_API_URL` | `https://api.evangelicapp.cl` |
-  | `NEXT_PUBLIC_SUPABASE_URL` | `https://lkcgiqmgdefhxhckedga.supabase.co` |
-  | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | *(anon key del §2)* |
+  | `NEXT_PUBLIC_SUPABASE_URL` | *(Project URL de prod, §3)* |
+  | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | *(anon key de prod, §3)* |
 
-  - [ ] **NO** setear `NEXT_IMAGES_UNOPTIMIZED` (es solo para Cloudflare/staging).
-  - [ ] `NEXT_PUBLIC_URL_POLITICA_PRIVACIDAD` — opcional; la página
-        `/politica-privacidad` ya existe y el fallback relativo alcanza.
-  - Recordá: las `NEXT_PUBLIC_*` se **hornean en build**. Cambiar cualquiera
-    exige **redeploy**, no basta con guardar.
+  - [ ] **NO** setear `NEXT_IMAGES_UNOPTIMIZED` acá salvo que quieras `<img>`
+        plano. En Workers, `next/image` on-the-fly **no** funciona sin un loader
+        (ver comentario en `next.config.ts`). **Recomendado: sí setearla a
+        `true`** — los logos ya son HTTPS públicos y chicos, no vale la pena
+        contratar Cloudflare Images. Decidilo antes del primer deploy de prod.
+  - Recordá: las `NEXT_PUBLIC_*` se hornean en build → cambiar una exige
+    **redeploy** (Deployments → Retry, o push nuevo).
 
-- [ ] **Settings → Domains → agregar `app.evangelicapp.cl`**. Vercel muestra el
-      registro DNS exacto a crear (§5). Hasta el merge de §7, este dominio sirve
-      la versión vieja de `main` — es esperable.
-- [ ] Plan: Vercel **Hobby es no comercial** por ToS. Esto es un SaaS comercial
-      → plan **Pro** (~USD 20/mes/miembro). Alternativa para evitar ese costo:
-      Cloudflare Workers (ya cableado, ver §9) — decisión aparte.
-
----
-
-## 5. DNS (en tu proveedor de zona — nic.cl o donde esté delegada)
-
-No tocar `evangelicapp.cl` ni `www` (landing ya andando). Agregar:
-
-- [ ] `app.evangelicapp.cl` → **CNAME** al target que muestra Vercel
-      (normalmente `cname.vercel-dns.com`).
-- [ ] `api.evangelicapp.cl` → **CNAME** al target que muestra Render
-      (`<servicio>.onrender.com`).
-- [ ] Esperar propagación y verificar que **ambos** emitieron certificado HTTPS
-      (Vercel y Render lo hacen solos vía Let's Encrypt una vez que el DNS
-      resuelve).
-- [ ] `curl -sI https://app.evangelicapp.cl` y `https://api.evangelicapp.cl`
-      → 200/redirect esperado, no error de cert.
+- [ ] **Custom domain**: Worker → Settings → Domains & Routes → **Add** →
+      Custom Domain → `app.evangelicapp.cl`. Cloudflare crea el registro DNS y el
+      cert solo (la zona ya está en la cuenta desde §2).
+- [ ] `wrangler.jsonc`: el `name` del Worker tiene que coincidir con el Worker
+      real (hoy `evangelicapp`). Si vas por Opción B, el Worker de staging
+      necesita su propio `name` — ver nota de `wrangler.jsonc`.
+- [ ] Workers Builds → confirmar rama de producción, build command
+      `npm run cf:build`, deploy `npx wrangler deploy`, root directory `frontend`.
+- [ ] Disparar un deploy y verificar (§8).
 
 ---
 
 ## 6. QA en staging (antes del cutover)
 
-Correr sobre `staging` (Cloudflare Workers o `npm run dev` contra el backend
-real). Flujos que `FEATURES.md` marca como **no probados e2e**:
+Sobre `evangelicapp.rojascofrem.workers.dev` (el Worker de staging), **no**
+`npm run dev` — hay que probar el runtime real de Workers:
 
 - [ ] Login OK + redirect a dashboard; cookies `Secure`/`SameSite=Lax` seteadas.
 - [ ] Refresh coordinado entre 2 pestañas (Web Locks) — ninguna se desloguea.
 - [ ] 3 logins fallidos → mensaje de cuenta bloqueada (`CUENTA_BLOQUEADA`).
-- [ ] Recuperación de contraseña de punta a punta (pedir link → correo llega →
-      resetear → login).
-- [ ] Finanzas: cargar movimientos (GET autenticado) + crear/editar uno
-      (mutación con CSRF).
-- [ ] Convocatoria en vivo: abrir el diálogo y `/agenda/convocatoria/<token>`
-      desde un mail real, responder desde otro dispositivo, ver el parcheo en
-      vivo.
-- [ ] Censo QR en vivo: registrar desde otro dispositivo con el panel abierto.
-- [ ] Renovación del token de realtime (>29 min con una pantalla "en vivo"
-      abierta — el canal no se corta).
+- [ ] Recuperación de contraseña de punta a punta (link → correo → reset → login).
+- [ ] Finanzas: cargar movimientos (GET autenticado) + crear/editar uno (CSRF).
+- [ ] Convocatoria en vivo: diálogo + `/agenda/convocatoria/<token>` desde un
+      mail real, responder desde otro dispositivo, ver el parcheo en vivo.
+- [ ] Censo QR en vivo desde otro dispositivo.
+- [ ] Renovación del token de realtime (>29 min con una pantalla "en vivo" abierta).
+- [ ] Logos de iglesia cargan (con `NEXT_IMAGES_UNOPTIMIZED` en el valor que
+      hayas elegido).
 - [ ] Rutas públicas sin sesión: `/predicacion/[token]`,
       `/agenda/asistencia/[token]`, `/integrantes/registro/[qrToken]`.
 
@@ -179,41 +204,37 @@ real). Flujos que `FEATURES.md` marca como **no probados e2e**:
 
 ## 7. Cutover
 
-**Orden estricto** (el merge dispara el deploy de producción en Vercel):
-
 1. [ ] §2, §3, §4, §5 completos y verificados.
-2. [ ] §6 (QA en staging) sin bloqueantes.
-3. [ ] Avisar / ventana de deploy acordada.
-4. [ ] Merge `staging` → `main`:
+2. [ ] §6 (QA) sin bloqueantes.
+3. [ ] Ventana de deploy acordada.
+4. [ ] **Opción A**: cambiar las variables del Worker `evangelicapp` a valores de
+      prod + agregar custom domain → Retry deploy.
+      **Opción B**: el Worker `evangelicapp-prod` ya está construyendo; agregarle
+      el custom domain.
+5. [ ] (Cuando quieras alinear `main`) Merge `staging` → `main`:
    ```bash
-   git checkout main
-   git pull origin main
+   git checkout main && git pull origin main
    git merge --no-ff staging
    git push origin main
    ```
-   > `main` está ~1 mes y 18 commits detrás de `staging` al momento de escribir
-   > esto. Revisar el diff del merge antes de pushear.
-5. [ ] Vercel despliega `main` a producción automáticamente. Seguir el build en
-      el dashboard.
+   `main` está ~1 mes / 18 commits detrás de `staging`. Revisá el diff.
 6. [ ] §8 (smoke test) inmediatamente después.
 
 ---
 
-## 8. Smoke test en producción (post-deploy)
+## 8. Smoke test en producción
 
-- [ ] `evangelicapp.cl` (landing) sigue intacta.
-- [ ] `app.evangelicapp.cl` carga: login, logo e `Inter`/`Playfair` OK.
-- [ ] Bundle del login apunta al backend correcto (no `localhost`):
-      `curl -s https://app.evangelicapp.cl/login | grep -o 'api.evangelicapp.cl'`
-      o revisá Network en el navegador.
+- [ ] `evangelicapp.cl` (landing) + correo siguen intactos.
+- [ ] `app.evangelicapp.cl` carga: login, logo, fuentes.
+- [ ] El bundle apunta al backend correcto:
+      `curl -s https://app.evangelicapp.cl/login` y revisar los chunks JS, o
+      Network en el navegador → `api.evangelicapp.cl`, no `onrender.com` ni `localhost`.
 - [ ] Login real → dashboard.
-- [ ] Navegar a Finanzas y cargar datos (GET autenticado funciona → cookies
-      viajan).
-- [ ] Crear/editar un registro (mutación → header `X-CSRF-Token` del body OK).
-- [ ] 2 pestañas + refresh de sesión → ambas siguen logueadas.
-- [ ] Una pantalla "en vivo" (censo QR o convocatoria) parchea desde otro
-      dispositivo — o degrada limpio a "sin realtime".
-- [ ] Logos de iglesia cargan (`next/image` optimizado vía Vercel).
+- [ ] Finanzas: cargar datos (GET autenticado → cookies viajan).
+- [ ] Crear/editar un registro (mutación → `X-CSRF-Token` del body OK).
+- [ ] 2 pestañas + refresh → ambas siguen logueadas.
+- [ ] Una pantalla "en vivo" parchea desde otro dispositivo, o degrada limpio.
+- [ ] Logos de iglesia cargan.
 - [ ] `/cuenta-suspendida` y `/facturacion` muestran `contacto@evangelicapp.cl`.
 - [ ] Un correo transaccional real llega (reset de contraseña).
 
@@ -221,27 +242,20 @@ real). Flujos que `FEATURES.md` marca como **no probados e2e**:
 
 ## 9. Rollback
 
-- **Frontend**: Vercel → Deployments → promover el deployment anterior a
-  Production (instantáneo). O `git revert -m 1 <sha-del-merge>` + push.
-- **Backend**: rollback del deploy en Render por separado. Ojo con migraciones
-  ya aplicadas a la BD prod — coordinar con backend antes de revertir.
-- Las `NEXT_PUBLIC_*` viejas quedan en el deployment viejo, así que promover un
-  deployment anterior en Vercel es consistente sin tocar variables.
+- **Frontend**: Cloudflare → Worker → **Deployments** → seleccionar la versión
+  anterior → **Rollback** (instantáneo). O `git revert` + push.
+- **Backend**: rollback del deploy en Render por separado. Ojo con migraciones ya
+  aplicadas a la BD prod — coordinar con backend.
+- Las `NEXT_PUBLIC_*` viejas están horneadas en el bundle viejo, así que el
+  rollback de la versión del Worker es consistente sin tocar variables.
 
 ---
 
-## 10. Alternativa a Vercel (nota de costos)
+## 10. Alternativa: Vercel
 
-El repo ya tiene cableado **Cloudflare Workers** vía `@opennextjs/cloudflare`
-(`wrangler.jsonc`, scripts `cf:*`) — hoy usado solo como **staging**. Se podría
-usar como producción para ahorrar el costo de Vercel Pro, **pero**:
-
-- Requiere `NEXT_IMAGES_UNOPTIMIZED=true` → `next/image` sirve `<img>` plano, sin
-  optimización on-the-fly.
-- La variable `NEXT_PUBLIC_API_URL` va en **Settings → Builds → Variables**
-  (no en Settings general — bug ya documentado en `FEATURES.md` 2026-08-25).
-- El deploy de staging a Cloudflare todavía tiene el login sin verificar e2e.
-
-El repo eligió Vercel para prod a propósito (comportamiento más fiel al runtime
-real de Next.js, optimización de imágenes sin config). Cambiar eso es una
-decisión aparte, no parte de este checklist.
+Si preferís no lidiar con la config de Workers y pagar para que sea un no-tema:
+Vercel (plan **Pro**, ~USD 20/mes/miembro — Hobby es no comercial). Proyecto con
+root directory `frontend/`, Node 20.x, production branch, las 3 `NEXT_PUBLIC_*`,
+custom domain `app.evangelicapp.cl`. `next/image` funciona sin config y sin
+`NEXT_IMAGES_UNOPTIMIZED`. El resto del checklist (DNS, Supabase, backend, CORS,
+smoke test) es igual.
