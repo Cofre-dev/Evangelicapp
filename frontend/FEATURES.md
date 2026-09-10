@@ -6,15 +6,40 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-10 — Estado real del deploy verificado: falta menos de lo que parecía
+
+**Por qué**: el fundador aportó datos y se verificó el estado real de la infra (DNS, backend, Worker). Resultó estar mucho más avanzado de lo que asumían las entradas anteriores.
+
+**Verificado (comandos de red + MCP de Cloudflare)**:
+- **DNS**: `evangelicapp.cl` ya está delegado a Cloudflare (nameservers `ignacio/zoe.ns.cloudflare.com`, puestos en nic.cl al comprar el dominio). Zona activa, landing + `www` sirviendo por Cloudflare (proxied). **No hay nada que hacer con el DNS.**
+- **Proyecto Supabase de producción**: **`woerftoeqarupnrggupl` = "evangelicapp-prod"** (confirmado por el fundador). El `lkcgiqmgdefhxhckedga` que estaba en `.env.example` y como fallback hardcodeado en `next.config.ts` quedó **obsoleto** — se corrigió en ambos.
+- **Worker `evangelicapp`**: ya tiene las 3 `NEXT_PUBLIC_*` en **valores de producción** (backend `evangelicapp-backend.onrender.com` + Supabase `evangelicapp-prod`). O sea, el Worker de "staging" ya corre el stack de producción completo — solo le falta el dominio lindo y confirmar el login.
+- **Backend (Render)**: responde; su CORS ya permite `https://evangelicapp.rojascofrem.workers.dev` con `credentials: true`. **NO** permite todavía `https://app.evangelicapp.cl` (falta agregarlo a `CORS_ORIGIN`).
+- No se pudo verificar el atributo `SameSite` de las cookies de sesión sin un login real. El hecho de que el CORS liste explícitamente el origin de `workers.dev` sugiere que el backend usa `SameSite=None` (si fuera `Lax` no tendría sentido cross-site), pero hay que confirmarlo con un login real.
+
+**Qué cambió en el repo**:
+- **`next.config.ts`**: el fallback del hostname de Supabase Storage pasó de `lkcgiqmgdefhxhckedga` a `woerftoeqarupnrggupl` (el proyecto de prod real).
+- **`.env.example`**: `NEXT_PUBLIC_SUPABASE_URL` corregido a `woerftoeqarupnrggupl`.
+- **`frontend/docs/deploy-produccion.md`**: reescrito y **acortado**. Ahora refleja el estado real: DNS listo, Worker con vars de prod, y solo 3 pasos pendientes (dominio `app.evangelicapp.cl` en el Worker vía dashboard; `CORS_ORIGIN` del backend; QA de login). Paso 4 (`api.evangelicapp.cl`) queda como opcional / obligatorio-si-el-login-falla.
+
+**Pendiente (infra, no código)**:
+1. Agregar `app.evangelicapp.cl` como Custom Domain del Worker `evangelicapp` (Cloudflare dashboard).
+2. Agregar `https://app.evangelicapp.cl` a `CORS_ORIGIN` del backend (Render).
+3. QA de login sobre `app.evangelicapp.cl`. Si falla por cookies cross-site → Paso 4 (`api.evangelicapp.cl`, mismo dominio raíz).
+4. Backend prod al día: confirmar que Render prod tiene los cambios que el frontend de `staging` asume + migraciones aplicadas a `evangelicapp-prod`.
+5. (Más adelante) merge `staging → main`; separar un entorno de staging real.
+
+---
+
 ## 2026-09-09 — Hosting de producción: Cloudflare Workers (no Vercel) + next.config.ts env-driven para Supabase
 
 **Por qué**: seguimiento de la entrada de abajo. Al evaluar el costo (Vercel Pro ~USD 20/mes para uso comercial, encima de Render Pro + Supabase Pro ya contratados) y que el Worker de Cloudflare ya está cableado, se decidió hostear producción en **Cloudflare Workers**, no en Vercel. El repo ya tenía `@opennextjs/cloudflare` + `wrangler.jsonc` + Workers Builds; lo que era "target de staging" pasa a ser el camino de producción.
 
 **Inspección del estado real del Worker** (vía MCP de Cloudflare, solo lectura):
 - Worker `evangelicapp` (`evangelicapp.rojascofrem.workers.dev`), Workers Builds conectado al repo, rama de producción = `staging`. Build `npm run cf:build`, deploy `npx wrangler deploy`, Node 20.20.2.
-- **Las 3 variables `NEXT_PUBLIC_*` ya están seteadas** en el panel de Builds — el bug de 2026-08-25 (variable en el panel equivocado) está resuelto. Valores actuales = staging: API `evangelicapp-backend.onrender.com`, Supabase `woerftoeqarupnrggupl.supabase.co` (proyecto **Backend-staging**, distinto del de `.env.example`), anon key `sb_publishable_...`.
+- **Las 3 variables `NEXT_PUBLIC_*` ya están seteadas** en el panel de Builds — el bug de 2026-08-25 (variable en el panel equivocado) está resuelto: API `evangelicapp-backend.onrender.com`, Supabase `woerftoeqarupnrggupl.supabase.co`, anon key `sb_publishable_...`.
 - Sin custom domain / routes — solo el `*.workers.dev`. Builds pasan limpios.
-- **Hallazgo**: hay dos proyectos Supabase (`woerftoeqarupnrggupl` staging, `lkcgiqmgdefhxhckedga` el de `.env.example`/`next.config.ts`, presumiblemente prod). Hay que confirmar cuál es producción antes de setear variables.
+- **Hallazgo**: el ref de Supabase del Worker (`woerftoeqarupnrggupl`) no coincide con el de `.env.example`/`next.config.ts` (`lkcgiqmgdefhxhckedga`). Ver entrada del 2026-09-10 — el fundador confirmó que **`woerftoeqarupnrggupl` = evangelicapp-prod** es el de producción; `lkcgiqmgdefhxhckedga` quedó obsoleto en el repo.
 
 **Qué cambió en el repo**:
 - **`next.config.ts`**: el hostname de Supabase Storage en `images.remotePatterns` pasó de estar hardcodeado (`lkcgiqmgdefhxhckedga.supabase.co`) a derivarse de `NEXT_PUBLIC_SUPABASE_URL` (con fallback al valor viejo para builds locales/CI sin la variable). **Era un bug real**: en staging, que usa otro proyecto Supabase, cualquier `<Image>` apuntando a `woerftoeqarupnrggupl.supabase.co/storage/...` fallaba porque ese hostname no estaba permitido. Ahora "cambiar de entorno = cambiar la variable", igual que ya pasa con el backend.

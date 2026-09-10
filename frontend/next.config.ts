@@ -6,13 +6,13 @@ import type { NextConfig } from "next";
 const apiUrl = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001");
 
 // El hostname de Supabase Storage (logos/fotos servidos como URL absoluta) se
-// deriva de NEXT_PUBLIC_SUPABASE_URL igual que el del backend arriba: producción,
-// staging y preview son proyectos Supabase distintos, así que cambiar de entorno
-// tiene que ser solo cambiar la variable, no tocar este archivo. Fallback al
-// proyecto de producción para builds locales/CI que no definen la variable.
+// deriva de NEXT_PUBLIC_SUPABASE_URL igual que el del backend arriba: si en algún
+// momento hay un proyecto Supabase por entorno, cambiar de entorno es solo
+// cambiar la variable, no tocar este archivo. Fallback al proyecto de producción
+// (evangelicapp-prod) para builds locales/CI que no definen la variable.
 const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
-  : "lkcgiqmgdefhxhckedga.supabase.co";
+  : "woerftoeqarupnrggupl.supabase.co";
 
 // La optimización on-the-fly de next/image (endpoint /_next/image) es gratis
 // y no requiere config en Vercel. En el deploy a Cloudflare Workers (ver
