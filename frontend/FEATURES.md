@@ -6,6 +6,34 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-09 — Preparación para puesta en producción (dominio evangelicapp.cl)
+
+**Por qué**: se compró `evangelicapp.cl` (nic.cl), la landing ya está andando en el apex/`www`, y se contrató Supabase Pro + Render Pro para llevar la app a producción. Esta sesión prepara **el repo** para ese deploy; la infra en sí (Vercel, Render, Supabase, DNS) y el merge `staging → main` quedan pendientes y guiados por el checklist nuevo.
+
+**Decisión de topología**: el frontend (este repo) va en **Vercel** en `app.evangelicapp.cl`; el backend en **Render** en `api.evangelicapp.cl`. Los dos bajo el mismo dominio registrable a propósito: las cookies de sesión son `SameSite=Lax` host-only (`docs/auth-cookies.md`), así que subdominios del mismo raíz son *same-site* y las cookies viajan en cada `fetch` de `apiFetch` **sin que el backend tenga que pasar a `SameSite=None`**. Si el frontend quedara en `*.vercel.app` y el backend en `*.onrender.com` (cross-site), `Lax` no manda las cookies en los `fetch` y el login "entra" pero nada autenticado funciona después.
+
+**Qué cambió en el repo**:
+- **`frontend/docs/deploy-produccion.md`** (nuevo): checklist completo de puesta en producción — mapa de piezas, topología de dominios y su porqué, y pasos con `[ ]` para Supabase, backend/Render, Vercel, DNS, QA en staging, cutover (merge `staging → main`), smoke test y rollback. Incluye la alternativa Cloudflare Workers como nota de costos.
+- **Correo de soporte** `contacto@evangelic.app` → `contacto@evangelicapp.cl` en las 4 referencias hardcodeadas: `src/app/cuenta-suspendida/page.tsx`, `src/app/facturacion/page.tsx`, `src/app/finanzas/departamentos/page.tsx`, `src/app/politica-privacidad/page.tsx`. Confirmado con el fundador que `evangelic.app` se retira.
+- **`.env.example`**: `NEXT_PUBLIC_API_URL` vuelve a `http://localhost:3001` como valor por defecto (lo que copia un dev en un clone nuevo); la URL de producción (`https://api.evangelicapp.cl`) queda documentada como comentario, con nota de que se setea en el panel de Vercel. Corregido también el comentario de `NEXT_PUBLIC_URL_POLITICA_PRIVACIDAD` ("todavía no existe" → "esa página ya existe").
+- **`README.md`**: nueva sección "Deploy" (Vercel = prod, Cloudflare = staging) apuntando al checklist; nota de que las `NEXT_PUBLIC_*` se hornean en build.
+- **`docs/auth-cookies.md`**: nueva sección "Topología de producción (dominios)" — por qué `app.` + `api.` bajo `evangelicapp.cl` hace innecesario `SameSite=None`, por qué `csrf_token` igual va por el body, y el requisito de `CORS_ORIGIN` explícito.
+
+**Qué NO se tocó**: `src/lib/api.ts` y `src/stores/auth-store.ts` (CLAUDE.md: no tocar auth sin confirmar contrato con backend). El esquema actual ya soporta la topología `app.` + `api.` sin cambios de código. Tampoco se mergeó `staging → main` (pedido explícito del fundador — el merge dispara el deploy de prod en Vercel y necesita antes: QA en staging + backend de prod al día + Vercel/DNS configurados).
+
+**Verificación**: `npm run lint`, `npm run typecheck` y `npm run build` (con `NEXT_PUBLIC_API_URL=http://localhost:3001`, como CI) pasan limpios.
+
+**Pendiente / no hecho (infra, no código — todo en `docs/deploy-produccion.md`)**:
+1. **Backend de producción**: `main` del frontend (post-merge) asume cambios de backend que hoy solo están en staging (Realtime a Supabase Broadcast, bloqueo de login, convocatoria, recuperación de contraseña). El backend tiene que desplegar su parte a Render prod + aplicar migraciones a la Supabase de producción **antes** del cutover.
+2. **Supabase**: confirmar plan Pro en el proyecto `lkcgiqmgdefhxhckedga` (el ref hardcodeado en `next.config.ts`). Si prod usa un proyecto Supabase nuevo, hay que cambiar ese hostname en `next.config.ts`, no solo la variable.
+3. **Vercel**: crear/ajustar el proyecto (root `frontend/`, Node 20.x, production branch `main`, las 3 `NEXT_PUBLIC_*`, custom domain `app.evangelicapp.cl`). Plan Hobby es no comercial → Pro.
+4. **DNS en nic.cl**: `app` → CNAME a Vercel, `api` → CNAME a Render.
+5. **Backend en Render**: `CORS_ORIGIN` con `https://app.evangelicapp.cl`, `SUPABASE_JWT_SECRET`, vars de Resend, custom domain `api.evangelicapp.cl`.
+6. **QA en staging** de los flujos que la bitácora marca como no probados e2e.
+7. **Cutover**: merge `staging → main` + smoke test en producción.
+
+---
+
 ## 2026-09-08 — Estado de convocatoria (in-app + página pública) + UX de bloqueo de login
 
 **Por qué**: brief del backend en `frontend/prompt.md`. Backend ya implementado y desplegado en `staging` (migraciones `20260908203618_add_login_lockout` y `20260908204221_realtime_convocatoria_topic` aplicadas a `Backend-staging`; **prod todavía no**). Tres bloques.

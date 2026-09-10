@@ -44,6 +44,14 @@ CI (`.github/workflows/ci.yml`) corre `lint`, `typecheck` y `build` en cada PR/p
 | `NEXT_PUBLIC_API_URL`    | URL base del backend. Se usa tanto en `src/lib/api.ts` como para derivar el dominio permitido de imágenes en `next.config.ts` (`images.remotePatterns`) — no hace falta tocar `next.config.ts` al cambiar de entorno, solo esta variable. |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Proyecto Supabase "Backend" — usadas **solo** por el canal de Supabase Realtime (ver "Tiempo real"). La anon key no es secreta (publishable). Si faltan, la app corre sin tiempo real (sin romper). |
 
+Las `NEXT_PUBLIC_*` se hornean en el build — cambiarlas exige un redeploy, no basta con guardarlas en el panel del hosting.
+
+## Deploy
+
+- **Producción**: este frontend se despliega en **Vercel** (rama `main`, root directory `frontend/`) en `app.evangelicapp.cl`. El backend va aparte en **Render** (`api.evangelicapp.cl`); ambos bajo el mismo dominio raíz a propósito, para que las cookies de sesión `SameSite=Lax` viajen en los `fetch` sin cambios de backend.
+- **Staging/QA**: **Cloudflare Workers** vía `@opennextjs/cloudflare` (rama `staging`, scripts `cf:*`, `wrangler.jsonc`).
+- Checklist completo de puesta en producción (DNS, variables, Supabase, CORS, orden de cutover, smoke test, rollback): [`docs/deploy-produccion.md`](./docs/deploy-produccion.md).
+
 ## Estructura del proyecto
 
 ```

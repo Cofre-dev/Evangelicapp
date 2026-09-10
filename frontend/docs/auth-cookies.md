@@ -50,6 +50,14 @@ Por qué double-submit y no solo `SameSite=Lax`: `Lax` ya bloquea el CSRF clási
 
 `CORS_ORIGIN` en `.env` acepta uno o varios orígenes separados por coma; `credentials: true` está habilitado (obligatorio para que el navegador mande cookies cross-origin). Un origin no listado no recibe `Access-Control-Allow-Origin` en la respuesta — el navegador bloquea la lectura de la respuesta aunque la request al servidor sí se ejecute (esto es importante para endpoints mutantes: el CSRF middleware es la protección real, CORS por sí solo no evita que la request llegue al servidor).
 
+## Topología de producción (dominios)
+
+`app.evangelicapp.cl` (frontend, Vercel) y `api.evangelicapp.cl` (backend, Render) comparten el dominio registrable `evangelicapp.cl` → las requests de `apiFetch` son **same-site**, así que las cookies `SameSite=Lax` viajan en cada `fetch` sin necesidad de `SameSite=None` ni de fijar `Domain`. La cookie sigue siendo host-only sobre `api.evangelicapp.cl` (el navegador la manda a ese host la inicie quien la inicie, mientras `Lax` lo permita — y `Lax` permite same-site).
+
+`csrf_token` **no** se comparte por subdominio: el JS de `app.` no puede leer una cookie host-only de `api.`. Por eso el backend manda el valor en el body de `/auth/login` y `/auth/refresh` y `src/lib/api.ts` lo guarda en memoria (`csrfToken`), no lo lee de `document.cookie`.
+
+Requisito de infra: `CORS_ORIGIN` del backend debe listar `https://app.evangelicapp.cl` explícitamente (sin wildcard — `credentials: true` no lo admite). Checklist completo en [`deploy-produccion.md`](./deploy-produccion.md).
+
 ## Rotación de refresh token y condición de carrera entre tabs
 
 El refresh token rota en cada uso (`refresh_token` viejo queda `revoked` en BD, se emite uno nuevo). La rotación es atómica en el backend (`updateMany` condicional sobre `revoked: false`): si dos requests llegan casi al mismo tiempo con el mismo refresh token, exactamente una gana y rota; la otra recibe `401` limpio.
