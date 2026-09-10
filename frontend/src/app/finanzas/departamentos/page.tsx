@@ -139,7 +139,7 @@ export default function GestionarDepartamentosPage() {
         {!puedeCrear && (
           <Alert className="mt-6">
             <AlertDescription>
-              Tu plan actual no incluye subdepartamentos de finanzas. Habla con contacto@evangelic.app para subir de
+              Tu plan actual no incluye subdepartamentos de finanzas. Habla con contacto@evangelicapp.cl para subir de
               plan.
             </AlertDescription>
           </Alert>

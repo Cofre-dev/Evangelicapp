@@ -14,7 +14,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 
 // Sin pasarela de pago: los pagos se confirman manualmente por el SuperAdmin
 // (ver frontend/prompt.md) — esta pantalla es 100% informativa, sin acciones.
-const CONTACTO_EMAIL = "contacto@evangelic.app";
+const CONTACTO_EMAIL = "contacto@evangelicapp.cl";
 
 export default function FacturacionPage() {
   const { usuario, ready } = useRequireAuth();

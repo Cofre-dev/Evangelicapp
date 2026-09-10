@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "Cómo Evangelicapp y las iglesias que usan la plataforma tratan tus datos personales.",
 };
 
-const CONTACTO_EMAIL = "contacto@evangelic.app";
+const CONTACTO_EMAIL = "contacto@evangelicapp.cl";
 const ULTIMA_ACTUALIZACION = "21 de agosto de 2026";
 
 interface Seccion {

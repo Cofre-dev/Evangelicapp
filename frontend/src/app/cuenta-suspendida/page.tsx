@@ -7,7 +7,7 @@ import { Mail, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-const CONTACTO_EMAIL = "contacto@evangelic.app";
+const CONTACTO_EMAIL = "contacto@evangelicapp.cl";
 
 function CuentaSuspendidaContent() {
   const searchParams = useSearchParams();
