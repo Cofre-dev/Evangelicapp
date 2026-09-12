@@ -6,6 +6,40 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-12 — Favicon: el repo no tenía ninguno configurado
+
+**Por qué**: el fundador preguntó cómo configurar el favicon para producción. Se buscó en todo
+el repo (`src/app/`, `public/`) y **no existía ningún favicon** — ni `public/` (la carpeta ni
+siquiera existe), ni `app/icon.*`/`app/favicon.ico` (convención de archivos especiales del App
+Router), ni `metadata.icons` en `layout.tsx`. La pestaña del navegador mostraba el ícono
+genérico de Next.js/el navegador.
+
+**Qué se implementó**:
+- **`src/app/icon.png`** (nuevo, 256x256, transparente, 23.6 KB) y **`src/app/apple-icon.png`**
+  (nuevo, 180x180, fondo blanco — Apple rellena de negro el canal alfa si es transparente, 11.4 KB):
+  derivados con `sharp` del logo ya provisto por el fundador (`src/img/photo/logo-mark.png`,
+  1181x1181, recortado al contenido antes de reducir para no perder nitidez).
+- **No se tocó `layout.tsx` ni ningún código**: `icon.png` y `apple-icon.png` en `src/app/` son
+  convención de archivo especial del App Router (Next 13+) — Next los detecta solos y genera
+  las etiquetas `<link rel="icon">` / `<link rel="apple-touch-icon">` en el `<head>` de cada
+  página automáticamente. Verificado en el HTML servido por `next dev`:
+  `<link rel="icon" href="/icon.png?<hash>" type="image/png" sizes="256x256"/>` y el
+  equivalente `apple-touch-icon`. También aparecen como rutas propias en `next build`
+  (`○ /icon.png`, `○ /apple-icon.png`).
+
+**Importante para producción**: esto **no requiere ninguna configuración en Cloudflare** (a
+diferencia de `NEXT_PUBLIC_BIBLIA_API_KEY`) — son archivos estáticos que entran en el build.
+Basta con que el commit llegue a la rama que construye Workers Builds (`staging`).
+
+**No se generó** un `favicon.ico` clásico (multi-resolución) — todos los navegadores modernos
+(Chrome, Firefox, Edge, Safari 16+) soportan `icon.png` sin problema; se puede agregar más
+adelante si hiciera falta compatibilidad con clientes muy viejos.
+
+**Verificación**: `lint`/`typecheck`/`build` limpios; `next build` lista `/icon.png` y
+`/apple-icon.png` como rutas; el HTML servido por `next dev` trae ambos `<link>` en el `<head>`.
+
+---
+
 ## 2026-09-12 — Logo de Evangelicapp junto a la palabra "Evangelicapp" en el navbar
 
 **Por qué**: pedido del fundador — junto al nombre de la iglesia ya se muestra su logo
