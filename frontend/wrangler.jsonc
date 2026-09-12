@@ -4,14 +4,18 @@
 	// plan completo en frontend/docs/deploy-produccion.md.
 	//
 	// El name tiene que coincidir con el Worker que Workers Builds construye
-	// (hoy "evangelicapp", que sirve la rama `staging` en
-	// evangelicapp.rojascofrem.workers.dev). Si no coinciden, `wrangler deploy`
-	// tira "Failed to match Worker name" e intenta abrir un PR para "corregirlo".
+	// (hoy "evangelicapp", que construye la rama `staging`). Si no coinciden,
+	// `wrangler deploy` tira "Failed to match Worker name" e intenta abrir un PR
+	// para "corregirlo".
 	//
-	// Custom domain (app.evangelicapp.cl) y separación staging/producción: NO se
-	// configuran acá todavía. Agregar `routes`/`custom_domain` antes de que la
-	// zona evangelicapp.cl esté en la cuenta de Cloudflare hace fallar el deploy.
-	// Se hace desde el dashboard una vez que el DNS está delegado (checklist §5).
+	// Custom domain: `app.evangelicapp.cl` ya está activo, configurado desde el
+	// dashboard (Worker → Settings → Domains & Routes), no acá — declarar
+	// `routes`/`custom_domain` en este archivo sería redundante y puede chocar
+	// con lo del dashboard. El subdominio `*.workers.dev`
+	// (evangelicapp.rojascofrem.workers.dev) sigue resolviendo en paralelo a
+	// propósito: se deja hasta separar un entorno de staging real, porque los
+	// preview deployments de Workers Builds dependen de él (ver
+	// docs/deploy-produccion.md).
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "evangelicapp",
 	"main": ".open-next/worker.js",
