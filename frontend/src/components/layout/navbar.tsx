@@ -9,6 +9,12 @@ import { Building2, ChevronDown, LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
+// Derivado de src/img/photo/logo-mark.png (1181x1181, 570 KB): recortado al
+// contenido + reducido a 128x128 con sharp. En Cloudflare Workers
+// (NEXT_IMAGES_UNOPTIMIZED=true, ver next.config.ts) next/image no reoptimiza
+// nada en runtime, así que un <Image> en un header que se pinta en cada
+// página tiene que partir ya de un archivo chico — no del logo fuente.
+import logoMark from "@/img/photo/logo-mark-nav.png";
 import { apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type SessionUser } from "@/stores/auth-store";
 
@@ -161,7 +167,8 @@ export function Navbar() {
     <header className="border-b border-border bg-card">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-8">
         <div className="flex items-center gap-6">
-          <Link href="/" className="text-base font-semibold text-foreground">
+          <Link href="/" className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Image src={logoMark} alt="" width={24} height={24} className="h-6 w-6" priority />
             Evangelicapp
           </Link>
 

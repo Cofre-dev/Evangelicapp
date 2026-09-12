@@ -6,6 +6,34 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-12 — Logo de Evangelicapp junto a la palabra "Evangelicapp" en el navbar
+
+**Por qué**: pedido del fundador — junto al nombre de la iglesia ya se muestra su logo
+(`usuario.iglesia.logoUrl`), pero la marca "Evangelicapp" del navbar era solo texto. Se agregó
+el ícono de marca (`src/img/photo/logo-mark.png`, provisto por el fundador) al lado.
+
+**Qué cambió**:
+- **`src/img/photo/logo-mark-nav.png`** (nuevo): derivado de `logo-mark.png` (1181x1181,
+  570 KB) — recortado al contenido y reducido a 128x128 con `sharp` (ya era dependencia del
+  repo), 6.5 KB. **No se usó el archivo original directo**: en Cloudflare Workers
+  (`NEXT_IMAGES_UNOPTIMIZED=true`, ver `next.config.ts`) `next/image` no reoptimiza nada en
+  runtime — un `<Image>` en el header (se pinta en cada página) tiene que partir ya de un
+  archivo chico, no depender de un resize que en producción no va a pasar.
+- **`src/components/layout/navbar.tsx`**: `<Image>` con el logo (import estático desde
+  `@/img/photo/logo-mark-nav.png`, `alt=""` porque es decorativo — el texto "Evangelicapp" ya
+  es el label) antes de la palabra "Evangelicapp" en el header desktop, mismo tamaño (`h-6 w-6`)
+  que el logo de la iglesia que se muestra al lado. Import estático de un asset local (no una
+  URL remota) — no necesita entrar en `images.remotePatterns` de `next.config.ts`.
+
+**Qué NO se tocó**: el `SheetTitle` del menú móvil ("Menú") no lleva el logo — el pedido era
+específicamente el navbar desktop, junto al nombre de la iglesia.
+
+**Verificación**: `lint`, `typecheck`, `build` limpios — incluido un build con
+`NEXT_IMAGES_UNOPTIMIZED=true` (simula el entorno real de Cloudflare) para confirmar que el
+asset emitido es el derivado de 6.5 KB y no el original de 570 KB.
+
+---
+
 ## 2026-09-10 — Dashboard Manager/Usuario: fuera el widget de "tiempo en la app", entra "Versículo del día"
 
 **Por qué**: el fundador pidió sacar el widget "Tu tiempo en la app hoy" (cifra de minutos +
