@@ -6,6 +6,126 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-09-10 — Dashboard Manager/Usuario: fuera el widget de "tiempo en la app", entra "Versículo del día"
+
+**Por qué**: el fundador pidió sacar el widget "Tu tiempo en la app hoy" (cifra de minutos +
+mini-gráfico `TrendArea`) del dashboard de Manager/Usuario — métrica de vanidad, ocupaba una
+card full-width sin aportar valor. En su lugar, un versículo del día (Reina-Valera 1960).
+
+**Qué cambió**:
+- **`src/app/page.tsx`**: eliminado el bloque `personal.tiempoHoyMinutos` / `TrendArea`.
+  Se quitaron los imports que quedaban sin uso (`TrendArea`, `formatMinutos`,
+  `formatRangoFechas`). El `GET /dashboard` sigue trayendo `personal.*` — no se usa más en
+  esta página (sí `personal` no se usa; los `StatTile` de integrantes/agenda/ceremonias/equipo
+  siguen igual). En el mismo lugar ahora va `<VersiculoDelDia />`, gateado por
+  `tieneLandingPersonal` (MANAGER || USUARIO — no SUPER_ADMIN, que tiene su propio dashboard).
+- **`src/lib/versiculos.ts`** (nuevo): ~100 referencias curadas (cita en español + `passage`
+  en formato de la API de Biblia.com, con nombre de libro en inglés: `John3.16`, no `Juan3.16`).
+  `getReferenciaDelDia()` elige de forma determinística por día del año en horario de Chile
+  (`America/Santiago`, para que cambie a medianoche local y no a las ~21:00) + el año en la
+  rotación. Todas verificadas contra `RVR60`: devuelven texto limpio.
+- **`src/components/dashboard/versiculo-del-dia.tsx`** (nuevo): client component. Trae el texto
+  de `https://api.biblia.com/v1/bible/content/RVR60.txt.json?passage=<p>&key=<k>` (RVR1960),
+  lo normaliza (colapsa saltos de línea de la poesía; la API a veces concatena versículos de un
+  rango sin espacio tras el punto/coma — `esforzaos.Todas` → `esforzaos. Todas`), y lo cachea
+  en `localStorage` (`versiculo-del-dia:<fecha>`, una entrada, borra las de días anteriores).
+  Si falta la key o la request falla (red/CORS/API caída) → `return null`, la card no aparece y
+  el dashboard funciona igual.
+- **`.env.example`** + **`.env.local`**: `NEXT_PUBLIC_BIBLIA_API_KEY`. Es una key "Web" de
+  biblia.com (Faithlife/Logos) atada a `https://app.evangelicapp.cl` — no secreta, misma
+  categoría que la anon key de Supabase, no se commitea (vacía en `.env.example`).
+
+**Por qué Biblia.com y no otra fuente**:
+- Tiene **RVR1960** (`RVR60`), que es el texto que espera una iglesia evangélica chilena.
+  `bible-api.com` no tiene español; `wldeh/bible-api` solo tiene versiones sueltas (`es-vbl` es
+  una paráfrasis que no suena a Reina-Valera, `es-rv09` trae referencias cruzadas incrustadas
+  en el texto, inservible).
+- Gratis, límite 5.000 llamadas/hora, CORS abierto (anda desde `app.evangelicapp.cl` y desde
+  `localhost`). Es el camino **con licencia**: Faithlife tiene el derecho de servir RVR1960 y
+  sus términos te autorizan si ponés la atribución.
+- **Términos** (relevantes): (1) hay que reconocer el uso y linkear a biblia.com — se cumple
+  con la línea "Reina-Valera 1960 · vía Biblia.com" al pie de la card; (2) prohíbe extraer el
+  contenido para almacenarlo en otra base de datos → **no se puede pre-generar un JSON**, de ahí
+  el fetch en runtime + caché de navegador (una entrada por día, no una "base de datos").
+
+**Verificación**: `lint`, `typecheck`, `build` (con y sin la key, como CI) limpios. Las 100
+referencias probadas una a una contra la API (todas 200, texto limpio de RVR1960). Selección
+por día y normalización de texto verificadas. **Falta QA visual en navegador con sesión real**
+(misma limitación de siempre): confirmar que la card se ve bien con versículos cortos y largos
+(los rangos tipo `2 Corintios 4:16-18` son ~390 caracteres) en desktop y mobile.
+
+**Pendiente (infra, no código)**:
+1. Cargar `NEXT_PUBLIC_BIBLIA_API_KEY` en el panel de Build del Worker `evangelicapp` (Cloudflare)
+   → Retry / Deploy. Sin esto, la card no aparece en producción (pero no rompe nada).
+2. Nota: la key es domain-locked solo por Referer y el CORS de la API refleja cualquier origin,
+   así que en la práctica es usable desde cualquier lado. Es una key gratis con rate limit alto
+   y va en `NEXT_PUBLIC_` (pública por diseño) — riesgo bajo, pero no es un secreto fuerte.
+
+**`formatMinutos`** (en `src/components/dashboard/format.ts`) quedó sin uso en todo el repo
+(`formatRangoFechas` y `TrendArea` siguen usándose en `/superadmin`). Se dejó por si sirve; se
+puede borrar.
+
+---
+
+## 2026-09-10 — Migración al dominio propio: fuera la URL del Worker (`*.workers.dev`)
+
+**Por qué**: el fundador reportó que **confirmar asistencia** desde el correo y el **QR de
+integrantes** llevaban a `https://evangelicapp.rojascofrem.workers.dev`. Se migró todo a
+`app.evangelicapp.cl` (frontend) + `api.evangelicapp.cl` (backend). Los pasos de infra
+(Render, Cloudflare) ya se hicieron; esta entrada cubre lo que tocó en **este repo**.
+
+**Contexto — hecho fuera del repo, el frontend no lo toca**:
+- Custom domain `app.evangelicapp.cl` activo en el Worker `evangelicapp` (dashboard).
+- Backend en `api.evangelicapp.cl`: custom domain en Render + `CNAME api` en Cloudflare DNS (DNS only).
+- Render: `FRONTEND_URL` → `https://app.evangelicapp.cl`, `BACKEND_URL` → `https://api.evangelicapp.cl`.
+  Con eso, todos los links que arma el backend (confirmar asistencia, QR de integrantes,
+  invitación a predicador, "ver quién confirmó", recuperación de contraseña, botón "Ir a
+  EvangelicApp" de los correos de facturación, link de convocatoria por WhatsApp) ya salen
+  con el dominio bueno. El QR de integrantes se dibuja en el cliente
+  (`src/components/integrantes/qr-dialog.tsx`, `QRCode.toDataURL(qrInfo.urlRegistro)`) pero
+  la `urlRegistro` viene de `GET /integrantes/qr`, que la arma con `FRONTEND_URL` en cada
+  request — o sea el diálogo ya muestra `app.evangelicapp.cl` sin regenerar el token. Lo
+  único muerto son los QR **ya impresos/compartidos** con la URL vieja: hay que reimprimirlos.
+- `CORS_ORIGIN` del backend: incluye `https://app.evangelicapp.cl`, ya no acepta el Worker.
+
+**Qué cambió en el repo** (solo documentación — **no hay ninguna URL de backend hardcodeada
+en `src/`**: todo sale de `NEXT_PUBLIC_API_URL`, y `next.config.ts` deriva de esa var el host
+permitido de `next/image`, así que un cambio de dominio del backend es solo la variable):
+- **`README.md`** (sección "Deploy"): `app.` + `api.` bajo `evangelicapp.cl`, custom domain
+  activo, `*.workers.dev` sigue en paralelo hasta separar staging. Se sacó la frase de que
+  comparten raíz "para que `SameSite=Lax` funcione" (venía de la topología Vercel descartada;
+  además las cookies de prod son `None`).
+- **`docs/deploy-produccion.md`**: "Estado real" reescrito — los 2 pasos que faltaban (custom
+  domain + CORS) están hechos, y `api.evangelicapp.cl` también. Queda **1 pendiente de infra**:
+  `NEXT_PUBLIC_API_URL` del Worker sigue en `evangelicapp-backend.onrender.com` y hay que
+  pasarlo a `https://api.evangelicapp.cl` (dashboard → Build → Variables → Retry). El QA se
+  amplió con los links de correo (asistencia, QR, recuperación de contraseña) y el chequeo de
+  que `*.workers.dev` deje de responder si se apaga.
+- **`docs/auth-cookies.md`** ("Topología de producción"): `app.` + `api.` son **same-site**;
+  las cookies siguen `SameSite=None; Secure` (heredado de la etapa `*.workers.dev`), funciona
+  igual — no se tocó el backend al migrar. `CORS_ORIGIN` ya no lista el Worker.
+- **`wrangler.jsonc`** (comentario): custom domain activo, configurado en el dashboard y no
+  acá; el `*.workers.dev` se deja a propósito porque los preview deployments de Workers
+  Builds dependen de él.
+- **`.env.example`**: ya estaba bien (documenta `https://api.evangelicapp.cl`).
+
+**Qué NO se tocó**: `src/` (nada), `src/lib/api.ts`, `src/stores/auth-store.ts`, `next.config.ts`.
+Tampoco `wrangler.jsonc` en su config real (solo el comentario).
+
+**Pendiente (infra, no código)**:
+1. `NEXT_PUBLIC_API_URL` del Worker → `https://api.evangelicapp.cl` + redeploy. Hoy el bundle
+   desplegado se construye con el dominio de `onrender.com` (que resuelve igual, la app anda).
+2. (Opcional, es lo que pidió el fundador) Apagar `evangelicapp.rojascofrem.workers.dev`:
+   Worker → Settings → Domains & Routes → `workers.dev` → Disable, o `"workers_dev": false`
+   en `wrangler.jsonc`. **No se hizo acá** porque los preview deployments de Workers Builds
+   usan ese subdominio — dejarlo hasta separar un entorno de staging real.
+3. QA sobre `app.evangelicapp.cl` (ver checklist).
+4. Reimprimir los QR de integrantes que ya se compartieron con la URL vieja.
+
+**Verificación**: cambios solo de markdown, no se tocó código (`lint`/`typecheck`/`build` sin impacto).
+
+---
+
 ## 2026-09-10 — Estado real del deploy verificado: falta menos de lo que parecía
 
 **Por qué**: el fundador aportó datos y se verificó el estado real de la infra (DNS, backend, Worker). Resultó estar mucho más avanzado de lo que asumían las entradas anteriores.

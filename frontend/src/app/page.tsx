@@ -7,8 +7,7 @@ import { ArrowRight, Bell, Building2 } from "lucide-react";
 import { ProximosEventos } from "@/components/agenda/proximos-eventos";
 import type { Evento } from "@/components/agenda/types";
 import { StatTile } from "@/components/dashboard/stat-tile";
-import { TrendArea } from "@/components/dashboard/trend-area";
-import { formatMinutos, formatRangoFechas } from "@/components/dashboard/format";
+import { VersiculoDelDia } from "@/components/dashboard/versiculo-del-dia";
 import type { ManagerDashboardResponse } from "@/components/dashboard/types";
 import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
 import type { Nota } from "@/components/notas/types";
@@ -200,35 +199,7 @@ export default function Home() {
             </div>
           )}
 
-        {tieneLandingPersonal(usuario) && dashboardData && (
-          <div className="mt-6 rounded-4x2 border border-border bg-card p-9 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Tu tiempo en la app hoy</p>
-                <p className="mt-1 font-display text-3xl tabular-nums text-foreground">
-                  {formatMinutos(dashboardData.personal.tiempoHoyMinutos)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatMinutos(dashboardData.personal.tiempoSemanaMinutos)} esta semana
-                </p>
-              </div>
-              <div className="w-full sm:max-w-xs">
-                <TrendArea
-                  data={dashboardData.personal.tiempoPorDia.map((p) => ({ fecha: p.fecha, value: p.minutos }))}
-                  ariaLabel="Minutos de uso por día, últimos 7 días"
-                  caption={
-                    dashboardData.personal.tiempoPorDia.length > 0
-                      ? formatRangoFechas(
-                          dashboardData.personal.tiempoPorDia[0].fecha,
-                          dashboardData.personal.tiempoPorDia[dashboardData.personal.tiempoPorDia.length - 1].fecha,
-                        )
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {tieneLandingPersonal(usuario) && <VersiculoDelDia />}
 
         {tareas.length > 0 && (
           <button
