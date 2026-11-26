@@ -25,7 +25,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // Links públicos que llegan por correo (sin sesión): estado de convocatoria
     // y RSVP de un integrante. Igual que /predicacion/, van sin navbar/footer.
     pathname.startsWith("/agenda/convocatoria/") ||
-    pathname.startsWith("/agenda/asistencia/");
+    pathname.startsWith("/agenda/asistencia/") ||
+    // Link "Dejar de recibirlo" del reporte financiero mensual (sin sesión).
+    pathname.startsWith("/reporte-financiero/");
 
   if (ocultarShell) {
     return <>{children}</>;

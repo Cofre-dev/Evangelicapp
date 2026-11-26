@@ -4,6 +4,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
 import { ChangePasswordOnboardingModal } from "@/components/onboarding/change-password-modal";
 import { PersonalDataOnboardingModal } from "@/components/onboarding/personal-data-modal";
+import { Toaster } from "@/components/ui/toast";
 
 import "./globals.css";
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AppShell>{children}</AppShell>
         <ChangePasswordOnboardingModal />
         <PersonalDataOnboardingModal />
+        <Toaster />
       </body>
     </html>
   );

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileClock, LineChart, Loader2, Plus, Upload } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileClock, LineChart, Loader2, Mail, Plus, Upload } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -306,6 +306,15 @@ function FinanzasContent() {
               Ver analítica
             </Link>
           </Button>
+          {/* Solo el pastor configura el reporte a la congregación (no delegable a USUARIO). */}
+          {usuario.rol === "MANAGER" && (
+            <Button variant="outline" asChild>
+              <Link href="/finanzas/reporte-congregacion">
+                <Mail className="h-4 w-4" />
+                Reporte a la congregación
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setLogsOpen(true)}>
             <FileClock className="h-4 w-4" />
             Logs

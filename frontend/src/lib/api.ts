@@ -36,6 +36,8 @@ const CSRF_EXEMPT_PATHS = [
   /^\/agenda\/asistencias\/[^/]+\/responder$/,
   /^\/auth\/forgot-password$/,
   /^\/auth\/reset-password$/,
+  // Link "Dejar de recibirlo" del reporte financiero mensual (token en la URL).
+  /^\/reporte-financiero\/suscripcion\/[^/]+\/(baja|reactivar)$/,
 ];
 
 function isCsrfExempt(path: string): boolean {

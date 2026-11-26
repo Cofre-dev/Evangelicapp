@@ -11,6 +11,10 @@ export interface Integrante {
   createdAt: string;
   updatedAt: string;
   iglesiaId: string;
+  /** Consentimiento para el reporte financiero mensual. Solo lectura: lo da o
+   * lo quita la propia persona (formulario del QR o link del correo). */
+  aceptaReporteFinanciero: boolean;
+  aceptaReporteFinancieroEn: string | null;
 }
 
 export interface QrInfo {

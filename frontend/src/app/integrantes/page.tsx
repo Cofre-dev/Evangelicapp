@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { IdCard, Loader2, Mail, Phone, Trash2, User } from "lucide-react";
+import { FileBarChart, IdCard, Loader2, Mail, Phone, Trash2, User } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -176,6 +176,30 @@ export default function IntegrantesPage() {
                     <Phone className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <dt className="sr-only">Teléfono</dt>
                     <dd className="truncate text-foreground">{integrante.telefono}</dd>
+                  </div>
+                  {/* Solo lectura a propósito: el consentimiento lo da o lo quita
+                      únicamente la propia persona (QR o link del correo). */}
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <FileBarChart className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <dt className="sr-only">Reporte financiero mensual</dt>
+                    <dd>
+                      {integrante.aceptaReporteFinanciero ? (
+                        <span
+                          className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                          title={
+                            integrante.aceptaReporteFinancieroEn
+                              ? `Aceptó el ${new Date(integrante.aceptaReporteFinancieroEn).toLocaleDateString("es-CL")}`
+                              : undefined
+                          }
+                        >
+                          Recibe reporte
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground" title="No recibe el reporte financiero">
+                          —
+                        </span>
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </article>

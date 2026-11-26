@@ -105,6 +105,10 @@ const registroSchema = z.object({
   // tiene dónde guardar el consentimiento, así que este campo nunca se manda
   // en el body del POST — ver frontend/prompt.md.
   aceptaPolitica: z.boolean().refine((value) => value === true, "Debes aceptar el tratamiento de tus datos"),
+  // Consentimiento opcional e independiente para el reporte financiero
+  // mensual: nunca premarcado (tiene que ser explícito). Sí viaja al backend,
+  // como el string "true" solo cuando está marcado.
+  aceptaReporteFinanciero: z.boolean(),
 });
 
 type RegistroValues = z.infer<typeof registroSchema>;
@@ -132,6 +136,7 @@ export default function RegistroIntegrantePage() {
       miembroDesde: "",
       foto: undefined,
       aceptaPolitica: false,
+      aceptaReporteFinanciero: false,
     },
   });
 
@@ -186,6 +191,7 @@ export default function RegistroIntegrantePage() {
     formData.append("telefono", values.telefono);
     formData.append("miembroDesde", values.miembroDesde);
     if (values.foto) formData.append("foto", values.foto);
+    if (values.aceptaReporteFinanciero) formData.append("aceptaReporteFinanciero", "true");
 
     try {
       const respuesta = await apiFetch<RegistroConfirmacion>(`/integrantes/registro/${params.qrToken}`, {
@@ -432,6 +438,30 @@ export default function RegistroIntegrantePage() {
                           </FormLabel>
                         </div>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="aceptaReporteFinanciero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-start gap-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={(checked) => field.onChange(checked === true)}
+                              className="mt-0.5"
+                            />
+                          </FormControl>
+                          <FormLabel className="text-xs font-normal leading-snug text-muted-foreground">
+                            Acepto recibir por correo el{" "}
+                            <strong className="font-medium text-foreground">reporte financiero mensual</strong> de la
+                            iglesia (solo totales, sin datos personales). Puedo darme de baja cuando quiera desde el
+                            mismo correo. <span className="italic">(Opcional)</span>
+                          </FormLabel>
+                        </div>
                       </FormItem>
                     )}
                   />

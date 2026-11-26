@@ -6,6 +6,47 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-11-26 — Reporte financiero mensual a la congregación
+
+**Por qué**: el backend implementó (2026-11-26) un envío mensual por correo de un reporte
+financiero resumido (solo totales) a los integrantes que lo aceptan. Spec completa con los
+contratos de API en `frontend/prompt.md`. **No se documenta en la tesis** hasta que el autor lo pida.
+
+**Qué se implementó**:
+- **`src/app/finanzas/reporte-congregacion/page.tsx`** (nueva, solo `MANAGER`): interruptor de
+  envío automático (con confirmación al encender), destinatarios (aceptan/total + `QrDialog` si
+  nadie aceptó), vista previa por mes (selector de los últimos `mesesAtrasPermitidos` meses
+  cerrados, correo renderizado en `<iframe sandbox="">`, nunca `dangerouslySetInnerHTML`), envío
+  manual (202 + polling del historial cada 5 s, máx. 10 min; 409 recarga la vista previa),
+  historial con detalle del `snapshot` y categorías visibles (la UI muestra "visible", la API
+  recibe la lista de **ocultas**). Un `USUARIO` no ve el link y por URL directa (o 403) ve
+  "Solo el pastor puede configurar el reporte".
+- **`src/app/finanzas/page.tsx`**: botón "Reporte a la congregación" (solo `MANAGER`).
+- **`src/app/reporte-financiero/baja/[token]/page.tsx`** (nueva, pública, sin navbar): baja /
+  reactivación con clic explícito — nunca da de baja al cargar (los antispam abren los links).
+- **`src/lib/api.ts`**: `/reporte-financiero/suscripcion/:token/(baja|reactivar)` en
+  `CSRF_EXEMPT_PATHS`. **`app-shell.tsx`**: `/reporte-financiero/*` sin shell. No hay middleware
+  de auth en el frontend, así que no hizo falta nada más para que la ruta sea pública.
+- **Formulario del QR**: checkbox opcional, desmarcado por defecto; manda
+  `aceptaReporteFinanciero="true"` solo si está marcado.
+- **`/integrantes`**: badge de solo lectura "Recibe reporte" (tooltip con la fecha).
+- **Política de privacidad**: párrafo sobre el reporte y su revocación; fecha actualizada.
+- **Primitivas nuevas sin dependencias extra**: `src/components/ui/toast.tsx` (store Zustand +
+  `<Toaster/>` montado en `layout.tsx`; el repo no tenía toasts) y `src/components/ui/switch.tsx`
+  (`<button role="switch">`, no está `@radix-ui/react-switch`). Los "AlertDialog" del spec se
+  hicieron con el `Dialog` existente y los tooltips con `title`.
+
+**Pendiente / abierto**:
+- La migración `20261126120000_add_reporte_financiero_congregacion` tiene que estar aplicada en
+  producción; si no, estos endpoints fallan.
+- Quienes ya estaban registrados no pueden sumarse por su cuenta (el backend no actualiza el
+  consentimiento al reenviar el QR). La pantalla lo explica en "¿Cómo se suman más personas?".
+- Falta la prueba manual de punta a punta (checklist en `prompt.md`, sección 5) contra el backend real.
+
+**Verificación**: `lint`, `typecheck` y `build` limpios.
+
+---
+
 ## 2026-09-12 — Favicon: el repo no tenía ninguno configurado
 
 **Por qué**: el fundador preguntó cómo configurar el favicon para producción. Se buscó en todo

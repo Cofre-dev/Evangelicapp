@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const CONTACTO_EMAIL = "contacto@evangelicapp.cl";
-const ULTIMA_ACTUALIZACION = "21 de agosto de 2026";
+const ULTIMA_ACTUALIZACION = "26 de noviembre de 2026";
 
 interface Seccion {
   id: string;
@@ -86,6 +86,13 @@ const SECCIONES: Seccion[] = [
         <li>Registrar tu asistencia a actividades o eventos cuando la iglesia lleva ese control.</li>
         <li>Permitir que la iglesia te contacte por correo o teléfono sobre asuntos de la congregación.</li>
         <li>Fines administrativos internos de la iglesia (agenda, finanzas, notas).</li>
+        <li>
+          <strong>Reporte financiero mensual (solo si lo aceptas):</strong> si marcas la casilla correspondiente en el
+          formulario del QR, la iglesia usa tu correo para enviarte cada mes un reporte con los totales agregados de
+          sus finanzas (ingresos, egresos y balance por categoría), sin datos personales ni aportes individuales.
+          Puedes revocar este consentimiento en cualquier momento con el enlace &ldquo;Dejar de recibirlo&rdquo; que
+          trae cada correo.
+        </li>
       </ul>
     ),
   },
