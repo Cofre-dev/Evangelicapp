@@ -6,6 +6,23 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-11-26 — Deploy roto en Cloudflare: OpenNext rechaza Next.js 15 (fuera de soporte)
+
+**Qué pasó**: el build de Workers Builds del commit `39c4084` falló y producción quedó en la
+versión anterior (las rutas nuevas daban 404). Reproducido local con `npm run cf:build`:
+`ERROR Next.js version 15.5.24 is not supported by the Next.js team` — OpenNext corta el build
+cuando la major de Next tiene más de 2 años (Next 15 salió en oct-2024). No es por el código:
+**cualquier** commit fallaba desde ese corte; el último deploy bueno fue del 2026-09-12.
+
+**Fix temporal**: `cf:build` ahora pasa `--dangerouslyUseUnsupportedNextVersion` (Workers Builds
+corre `npm run cf:build`, así que no hizo falta tocar el dashboard). Verificado local: el build
+completo genera `.open-next/worker.js` con las rutas nuevas.
+
+**Pendiente (importante)**: migrar a Next.js 16. Next 15 ya no recibe parches de seguridad;
+el flag solo destraba el deploy, no resuelve eso.
+
+---
+
 ## 2026-11-26 — Reporte financiero mensual a la congregación
 
 **Por qué**: el backend implementó (2026-11-26) un envío mensual por correo de un reporte
