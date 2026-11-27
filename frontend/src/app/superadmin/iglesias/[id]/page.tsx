@@ -15,6 +15,7 @@ import { StatTile } from "@/components/dashboard/stat-tile";
 import { VerticalBars } from "@/components/dashboard/vertical-bars";
 import { formatMesCorto } from "@/components/dashboard/format";
 import { CambiarFacturacionDialog } from "@/components/iglesias/cambiar-facturacion-dialog";
+import { EliminarIglesiaDialog } from "@/components/iglesias/eliminar-iglesia-dialog";
 import { HistorialPagosCard } from "@/components/iglesias/historial-pagos-card";
 import { IglesiaLogo } from "@/components/iglesias/iglesia-logo";
 import {
@@ -74,6 +75,7 @@ export default function IglesiaDetallePage() {
   const [accionEnCurso, setAccionEnCurso] = useState<string | null>(null);
   const [accionError, setAccionError] = useState<string | null>(null);
   const [confirmFacturacionOpen, setConfirmFacturacionOpen] = useState(false);
+  const [eliminarOpen, setEliminarOpen] = useState(false);
 
   useEffect(() => {
     if (!usuario || !params.id) return;
@@ -500,6 +502,25 @@ export default function IglesiaDetallePage() {
                 )}
               </div>
             </div>
+
+            <div className="mt-6 rounded-2xl border border-destructive/40 bg-card p-6 shadow-sm">
+              <h2 className="text-sm font-medium text-destructive">Zona de peligro</h2>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+                <p className="max-w-md text-sm text-muted-foreground">
+                  Elimina la iglesia y todos sus datos de forma permanente. El pastor recibe un correo con el motivo.
+                </p>
+                <Button type="button" variant="destructive" onClick={() => setEliminarOpen(true)}>
+                  Eliminar iglesia
+                </Button>
+              </div>
+            </div>
+
+            <EliminarIglesiaDialog
+              iglesiaId={data.id}
+              iglesiaNombre={data.nombre}
+              open={eliminarOpen}
+              onOpenChange={setEliminarOpen}
+            />
 
             <CambiarFacturacionDialog
               iglesiaId={data.id}

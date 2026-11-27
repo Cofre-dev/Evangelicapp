@@ -11,7 +11,7 @@ import { z } from "zod";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ApiError, apiFetch } from "@/lib/api";
 
@@ -42,8 +42,21 @@ const FOTO_MAX_BYTES = 3 * 1024 * 1024;
 // la misma persona (más confiable que el email). Se valida formato + dígito
 // verificador (algoritmo módulo 11 estándar) del lado del cliente; la
 // deduplicación real la hace el backend.
+//
+// Tolerante con las formas en que la gente lo escribe (fue fuente de errores
+// reales): acepta puntos, espacios, guiones raros y RUT sin guion
+// ("123456789" → "12345678-9"). Lo que viaja al backend siempre es
+// "12345678-9" (sin puntos, con guion, K mayúscula).
 function normalizarRun(run: string): string {
-  return run.trim().replace(/\./g, "").toUpperCase();
+  const limpio = run
+    .trim()
+    .toUpperCase()
+    .replace(/[.\s]/g, "")
+    .replace(/[‐-―−]/g, "-");
+  if (!limpio.includes("-") && /^\d{7,8}[0-9K]$/.test(limpio)) {
+    return `${limpio.slice(0, -1)}-${limpio.slice(-1)}`;
+  }
+  return limpio;
 }
 
 const RUN_FORMATO = /^\d{7,8}-[0-9K]$/;
@@ -88,8 +101,8 @@ const registroSchema = z.object({
   run: z
     .string()
     .trim()
-    .min(1, "Ingresa tu RUN")
-    .refine(esRunValido, "Ingresa un RUN válido (ej. 12.345.678-9)"),
+    .min(1, "Ingresa tu RUT")
+    .refine(esRunValido, "RUT inválido: revisa los números y el dígito verificador (ej. 12.345.678-9)"),
   email: z.string().trim().min(1, "Ingresa tu correo").email("Ingresa un correo válido"),
   telefono: z.string().trim().min(1, "Ingresa tu teléfono").max(30, "Máximo 30 caracteres"),
   miembroDesde: z
@@ -301,10 +314,22 @@ export default function RegistroIntegrantePage() {
                     name="run"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>RUN</FormLabel>
+                        <FormLabel>RUT</FormLabel>
                         <FormControl>
-                          <Input autoComplete="off" placeholder="12.345.678-9" {...field} />
+                          <Input
+                            autoComplete="off"
+                            autoCapitalize="characters"
+                            spellCheck={false}
+                            placeholder="12.345.678-9"
+                            {...field}
+                          />
                         </FormControl>
+                        <FormDescription>
+                          Tu RUT completo con el dígito verificador al final, separado por un guion. Puedes escribirlo
+                          con o sin puntos: <strong className="font-medium text-foreground">12.345.678-9</strong> o{" "}
+                          <strong className="font-medium text-foreground">12345678-9</strong>. Si termina en K,
+                          escribe la K (ej. 9.876.543-K).
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
