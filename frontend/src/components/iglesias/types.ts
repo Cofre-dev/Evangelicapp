@@ -1,12 +1,29 @@
-export type PlanIglesia = "BASICO" | "MEDIO" | "PRO";
+/** `GRATUITO` (Red de iglesias + plan de autoservicio, ver FEATURES.md
+ * 2026-11-26): solo da acceso a la Red de iglesias; el resto de la plataforma
+ * es de pago. Una iglesia de pago con 3 días de mora también baja a GRATUITO
+ * (`planPrevioMora` guarda el plan que recupera al pagar). */
+export type PlanIglesia = "GRATUITO" | "BASICO" | "MEDIO" | "PRO";
+
+/** Planes de pago, en orden de menor a mayor. */
+export const PLANES_PAGO = ["BASICO", "MEDIO", "PRO"] as const;
+export type PlanPago = (typeof PLANES_PAGO)[number];
+
+export const PLANES_TODOS: PlanIglesia[] = ["GRATUITO", ...PLANES_PAGO];
+
+export const esPlanGratuito = (plan?: PlanIglesia | null) => plan === "GRATUITO";
+
+/** Mismo correo que ya usan facturación, cuenta suspendida y los topes de plan. */
+export const CONTACTO_EMAIL = "contacto@evangelicapp.cl";
 
 export const PLAN_LABEL: Record<PlanIglesia, string> = {
+  GRATUITO: "Gratuito",
   BASICO: "Básico",
   MEDIO: "Medio",
   PRO: "Pro",
 };
 
 export const PLAN_LIMITES: Record<PlanIglesia, { usuarios: number; departamentos: number }> = {
+  GRATUITO: { usuarios: 1, departamentos: 0 },
   BASICO: { usuarios: 3, departamentos: 0 },
   MEDIO: { usuarios: 8, departamentos: 0 },
   PRO: { usuarios: 15, departamentos: 10 },
@@ -17,6 +34,7 @@ export function planTieneSubdepartamentos(plan: PlanIglesia): boolean {
 }
 
 export const PLAN_BADGE_CLASSES: Record<PlanIglesia, string> = {
+  GRATUITO: "bg-emerald-50 text-emerald-700",
   BASICO: "bg-slate-100 text-slate-700",
   MEDIO: "bg-sky-100 text-sky-700",
   PRO: "bg-violet-100 text-violet-700",
@@ -52,7 +70,11 @@ export const FACTURACION_BAR_CLASSES: Record<EstadoFacturacion["color"], string>
 export interface LimitesIglesia {
   usuarios: { actuales: number; maximo: number };
   departamentosFinancieros: { actuales: number; maximo: number };
+  /** Solo en `GET /mi-iglesia/facturacion` (no en el detalle del SuperAdmin). */
+  llamadosAbiertos?: { actuales: number; maximo: number };
 }
+
+export type OrigenIglesia = "SUPER_ADMIN" | "AUTOSERVICIO";
 
 export interface MiembroEquipo {
   id: string;
@@ -98,7 +120,13 @@ export interface IglesiaDetalle {
   createdAt: string;
   ultimoPagoAt: string | null;
   plan: PlanIglesia;
-  facturacion: EstadoFacturacion;
+  /** Plan que recupera al pagar si bajó a GRATUITO por mora; `null` si no. */
+  planPrevioMora: PlanIglesia | null;
+  origen: OrigenIglesia;
+  verificada: boolean;
+  verificadaEn: string | null;
+  /** `null` en plan GRATUITO: no hay semáforo ni fecha de cobro. */
+  facturacion: EstadoFacturacion | null;
   limites: LimitesIglesia;
   // Este endpoint (`/iglesias/:id`, exclusivo de SUPER_ADMIN) no está
   // mencionado explícitamente en el brief de `frontend/prompt.md`. Se deja el
@@ -130,7 +158,16 @@ export interface IglesiaResumen {
 /** `GET /iglesias` (nuevo, SuperAdmin) — mismo `IglesiaResumen` + el semáforo
  * de facturación por fila (ver frontend/prompt.md sección 4). */
 export interface IglesiaListItem extends IglesiaResumen {
-  facturacion: EstadoFacturacion;
+  /** `null` en plan GRATUITO. */
+  facturacion: EstadoFacturacion | null;
+  planPrevioMora: PlanIglesia | null;
+  origen: OrigenIglesia;
+  verificada: boolean;
+}
+
+/** "Gratuito (mora: Básico)" si bajó por mora, si no el label del plan. */
+export function planLabelConMora(plan: PlanIglesia, planPrevioMora: PlanIglesia | null | undefined): string {
+  return plan === "GRATUITO" && planPrevioMora ? `Gratuito (mora: ${PLAN_LABEL[planPrevioMora]})` : PLAN_LABEL[plan];
 }
 
 /** `GET /iglesias/:id/historial-pagos` (SuperAdmin) — más reciente primero; el

@@ -77,11 +77,15 @@ export function EditarIglesiaForm({ iglesia, onUpdated }: EditarIglesiaFormProps
       onUpdated(actualizada);
       // El navbar/home muestran usuario.iglesia.{nombre,logoUrl,plan} desde la
       // sesión persistida — sin esto, un cambio de nombre acá no se vería
-      // reflejado ahí hasta el próximo login. `plan` no lo devuelve este
-      // endpoint (no cambia acá), así que se conserva el que ya está en sesión.
+      // reflejado ahí hasta el próximo login. `plan` ahora viene en la
+      // respuesta; si no viniera, se conserva el que ya está en sesión.
       if (usuarioActual?.iglesia) {
         updateUsuario({
-          iglesia: { nombre: actualizada.nombre, logoUrl: actualizada.logoUrl, plan: usuarioActual.iglesia.plan },
+          iglesia: {
+            nombre: actualizada.nombre,
+            logoUrl: actualizada.logoUrl,
+            plan: actualizada.plan ?? usuarioActual.iglesia.plan,
+          },
         });
       }
       setSaved(true);

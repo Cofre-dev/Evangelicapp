@@ -1,4 +1,5 @@
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, type SessionUser } from "@/stores/auth-store";
+import { useUpsellStore } from "@/stores/upsell-store";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -13,6 +14,13 @@ export class ApiError extends Error {
     public readonly body?: unknown,
   ) {
     super(message);
+  }
+
+  /** `code` del body de error (ej. `REQUIERE_PLAN_PAGO`, `LIMITE_PLAN`,
+   * `IGLESIA_SUSPENDIDA`), si el backend lo manda. */
+  get code(): string | undefined {
+    const code = (this.body as { code?: unknown } | null | undefined)?.code;
+    return typeof code === "string" ? code : undefined;
   }
 }
 
@@ -38,6 +46,9 @@ const CSRF_EXEMPT_PATHS = [
   /^\/auth\/reset-password$/,
   // Link "Dejar de recibirlo" del reporte financiero mensual (token en la URL).
   /^\/reporte-financiero\/suscripcion\/[^/]+\/(baja|reactivar)$/,
+  // Registro público de iglesias (plan GRATUITO) y su link de confirmación.
+  /^\/red\/registro$/,
+  /^\/red\/registro\/confirmar\/[^/]+$/,
 ];
 
 function isCsrfExempt(path: string): boolean {
@@ -167,6 +178,16 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       }
     }
 
+    // Plan GRATUITO llamando a un módulo de pago. No es un error genérico ni
+    // un motivo para desloguear: se muestra el upsell global y se refresca la
+    // sesión, porque el plan puede haber cambiado con la sesión abierta (mora
+    // → gratuito) y la navegación se calcula a partir de `usuario.iglesia.plan`.
+    // Igual se lanza el error para que la pantalla deje de mostrar "cargando".
+    if (res.status === 403 && (body as { code?: string } | null)?.code === "REQUIERE_PLAN_PAGO") {
+      useUpsellStore.getState().abrir();
+      void refrescarUsuario();
+    }
+
     throw new ApiError(res.status, message ?? "Ocurrió un error inesperado", body);
   }
 
@@ -175,4 +196,28 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   }
 
   return res.json() as Promise<T>;
+}
+
+let refrescoEnCurso: Promise<void> | null = null;
+
+/**
+ * Vuelve a pedir `GET /auth/me` y actualiza la sesión persistida (plan,
+ * nombre/logo de la iglesia, etc.). Deduplicado: varias requests que caen en
+ * `REQUIERE_PLAN_PAGO` a la vez disparan un solo refresh.
+ */
+export function refrescarUsuario(): Promise<void> {
+  if (!useAuthStore.getState().usuario) return Promise.resolve();
+  if (!refrescoEnCurso) {
+    refrescoEnCurso = apiFetch<SessionUser>("/auth/me")
+      .then((usuario) => {
+        if (useAuthStore.getState().usuario) useAuthStore.getState().updateUsuario(usuario);
+      })
+      .catch(() => {
+        // Si falla, la navegación queda con el plan que ya había en sesión.
+      })
+      .finally(() => {
+        refrescoEnCurso = null;
+      });
+  }
+  return refrescoEnCurso;
 }

@@ -6,6 +6,78 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-11-27 — Red de iglesias + plan GRATUITO (autoservicio)
+
+**Por qué**: el backend implementó (2026-11-27) el plan GRATUITO (registro sin SuperAdmin, solo
+da acceso a la Red de iglesias), la Red de iglesias (directorio, llamados de ayuda con
+necesidades concretas, "¡Yo te ayudo!", alianzas, notificaciones) y el cambio de mora: a los 3
+días una iglesia de pago **baja a gratuito** en vez de quedar bloqueada. Spec con los contratos
+en `frontend/prompt.md`. **No se documenta en la tesis** hasta que el autor lo pida.
+
+**Rama**: `feature/red-de-iglesias`. El brief pedía crearla desde `testing`, pero `testing` era un
+ancestro estricto de `staging` (le faltaban 30 commits ya en producción), así que se creó desde
+la punta de `staging` (equivale a `testing` fast-forwardeado). **No mergear a `staging` hasta que
+el backend con esta migración esté en producción.**
+
+**Qué se implementó**:
+- **Base**: `PlanIglesia` suma `GRATUITO` (+ `PLANES_PAGO`, `esPlanGratuito`, `planLabelConMora`,
+  `CONTACTO_EMAIL` centralizado en `iglesias/types.ts`). `facturacion` es `EstadoFacturacion | null`
+  en todos lados; campos nuevos `planPrevioMora`, `origen`, `verificada(En)`,
+  `limites.llamadosAbiertos`. `ApiError.code` (getter sobre el body).
+- **`api.ts`**: `/red/registro` y `/red/registro/confirmar/:token` en `CSRF_EXEMPT_PATHS`. Un 403
+  `REQUIERE_PLAN_PAGO` abre el modal de upsell global (`stores/upsell-store.ts`) y llama a
+  `refrescarUsuario()` (nuevo, `GET /auth/me` deduplicado) para recalcular la navegación.
+- **Gate de plan** (`app-shell.tsx` + `red/permisos.ts`): una iglesia GRATUITO que entra por URL a
+  `/agenda`, `/finanzas`, `/ceremonias`, `/integrantes`, `/notas`, `/equipo`, `/accesos` ve
+  `UpsellPlanPantalla` en vez de montar la página (no se dispara ninguna request de pago). El home
+  redirige a `/red` sin pedir `/dashboard`. El navbar muestra los módulos de pago con candado
+  (abren el upsell). `/registro*` va sin shell.
+- **Banner de mora** (en `FacturacionAlertas`, todas las pantallas) cuando viene `planPrevioMora`.
+  Se re-pide al cambiar el plan en sesión. Textos de mora actualizados ("pasa al plan gratuito").
+- **`/facturacion`**: vista GRATUITO (cupos usuarios/llamados + tarjetas de planes de pago con CTA
+  por correo, sin precios) y fila "Llamados de ayuda abiertos" en planes de pago.
+- **Registro público**: `/registro` (formulario con validación igual al backend, Turnstile vía
+  script oficial en `components/registro/turnstile.tsx`, 409 junto al campo, 429, reset del widget
+  tras cualquier error) y `/registro/confirmar/[token]` (200/410/404; lleva a
+  `/login?email=…`, que ahora precarga el correo). Link "Regístrala gratis" en `/login`.
+- **Sección `/red`** (`app/red/layout.tsx` con guard MANAGER/USUARIO, subnavegación y contexto
+  compartido en `stores/red-store.ts`): Feed (alcance/tipo/cerrados, "Cargar más"), Publicar
+  llamado (necesidades dinámicas 0-10, visibilidad con "Solo aliadas" deshabilitada sin aliadas,
+  `LIMITE_PLAN` con CTA), Detalle (progreso, "¡Yo te ayudo!" con precarga/actualización, cancelar
+  apoyo, editar/cubierto/reabrir/cerrar, reportar, banner de moderación, realtime
+  `red:llamado-actualizado`), Mis llamados, Mis apoyos, Directorio (por defecto mi comuna, debounce
+  300 ms), Perfil de iglesia (contacto solo si viene; `sitioWeb` solo http/https), Alianzas
+  (badge de recibidas en la subnav), Mi perfil en la red (solo lectura para USUARIO). Toda
+  escritura se esconde a USUARIO. El progreso/estado CUBIERTO nunca se calcula en el frontend.
+- **Campana** (`layout/notificaciones-bell.tsx`, `Sheet`) + página `/notificaciones` + preferencia
+  de correo en `/perfil`. Realtime `notificacion:nueva` refresca el contador (sin confiar en el
+  payload); `PLAN_DEGRADADO` además refresca la sesión.
+- **SuperAdmin**: listado con badges origen/verificada/plan (con mora) y filtros nuevos; franja
+  neutra si `facturacion === null`. Detalle: verificar/quitar verificación, selector con Gratuito
+  (nota de contratación), "Marcar pagada" deshabilitado en GRATUITO sin plan previo y
+  "Confirmar pago y restaurar plan X" con mora, sin semáforo/fecha/historial en gratuito.
+  Dashboard: tarjeta "Iglesias por verificar" (realtime `iglesia:registrada`). Nueva
+  `/superadmin/red` (moderación de reportes). Links nuevos en el menú del SuperAdmin.
+- **Política de privacidad**: párrafos de Red de iglesias y avisos por correo.
+- `.env.example`: `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+**Decisiones / desvíos del brief**:
+- Correo de ventas: el brief decía `contacto@evangelic.app` "mismo email que ya se usa"; el que
+  ya se usa es `contacto@evangelicapp.cl`, se dejó ese.
+- El directorio no trae el id de la alianza: para retirar/aceptar/rechazar desde el directorio o
+  el perfil se busca en `GET /red/alianzas?estado=PENDIENTE` al momento de actuar.
+- `PATCH /red/llamados/:id` manda `null` solo para borrar un valor que antes existía (el brief
+  no aclara si acepta `null`; si no, ajustar a omitir).
+- Sin dependencias nuevas: tabs, radios y tooltips hechos a mano (`title`).
+
+**Pendiente / abierto**:
+- Probar el checklist manual del brief (sección 6) contra el backend real; no hay tests.
+- Configurar `NEXT_PUBLIC_TURNSTILE_SITE_KEY` en Cloudflare y `TURNSTILE_SECRET_KEY` en Render.
+- Marcar leídas desde `/notificaciones` no actualiza el contador de la campana hasta el próximo
+  evento o recarga.
+
+---
+
 ## 2026-11-26 — Deploy roto en Cloudflare: OpenNext rechaza Next.js 15 (fuera de soporte)
 
 **Qué pasó**: el build de Workers Builds del commit `39c4084` falló y producción quedó en la

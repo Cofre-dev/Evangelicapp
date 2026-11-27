@@ -13,6 +13,7 @@ import { VerticalBars } from "@/components/dashboard/vertical-bars";
 import { formatHoraUTC, formatMesCorto, formatRangoFechas } from "@/components/dashboard/format";
 import type { SuperAdminDashboardResponse } from "@/components/dashboard/types";
 import { IglesiaLogo } from "@/components/iglesias/iglesia-logo";
+import { ColaVerificacion } from "@/components/iglesias/cola-verificacion";
 import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useRealtimeEvent } from "@/hooks/use-realtime";
@@ -129,6 +130,8 @@ export default function SuperAdminDashboardPage() {
                 </div>
               </div>
             </div>
+
+            <ColaVerificacion />
 
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <StatTile label="Iglesias activas" value={data.totales.iglesiasActivas.toLocaleString("es-CL")} />

@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditarIglesiaForm } from "@/components/mi-iglesia/editar-iglesia-form";
 import { LogoIglesiaUploader } from "@/components/mi-iglesia/logo-iglesia-uploader";
 import type { MiIglesia } from "@/components/mi-iglesia/types";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
+import { VerificadaBadge } from "@/components/red/verificada-badge";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ApiError, apiFetch } from "@/lib/api";
 
@@ -66,8 +68,19 @@ export default function MiIglesiaPage() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">Mi iglesia</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Corrige los datos ingresados al momento del alta de tu iglesia.
+            Corrige los datos ingresados al momento del alta de tu iglesia. El nombre, la comuna y el logo también son
+            los que ven las demás iglesias en la Red de iglesias.
           </p>
+          {iglesia && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {iglesia.plan && (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE_CLASSES[iglesia.plan]}`}>
+                  Plan {PLAN_LABEL[iglesia.plan]}
+                </span>
+              )}
+              {typeof iglesia.verificada === "boolean" && <VerificadaBadge verificada={iglesia.verificada} />}
+            </div>
+          )}
         </div>
 
         {error && (

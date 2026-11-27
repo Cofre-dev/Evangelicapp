@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { FacturacionResponse } from "@/components/facturacion/types";
+import { PLAN_LABEL } from "@/components/iglesias/types";
 import { apiFetch } from "@/lib/api";
 import { useAuthStore, type Rol } from "@/stores/auth-store";
 
@@ -32,26 +33,48 @@ export function FacturacionAlertas() {
   const [data, setData] = useState<FacturacionResponse | null>(null);
   const [modalCerrado, setModalCerrado] = useState(false);
 
+  // Depende del plan además del usuario: si cambia con la sesión abierta
+  // (mora → gratuito, o el SuperAdmin restaura el plan) se vuelve a pedir.
+  const usuarioId = usuario?.id;
+  const rol = usuario?.rol;
+  const plan = usuario?.iglesia?.plan;
+
   useEffect(() => {
-    if (!hasHydrated || !usuario || !tieneAccesoFacturacion(usuario.rol)) return;
+    if (!hasHydrated || !usuarioId || !rol || !tieneAccesoFacturacion(rol)) {
+      setData(null);
+      return;
+    }
     apiFetch<FacturacionResponse>("/mi-iglesia/facturacion")
       .then(setData)
       .catch(() => {
         // Alerta informativa, no crítica: si falla, simplemente no se muestra.
       });
-  }, [hasHydrated, usuario]);
+  }, [hasHydrated, usuarioId, rol, plan]);
 
   if (!data) return null;
 
-  const { diasParaFacturacion, enMora, diasEnMora } = data.facturacion;
+  // Plan GRATUITO: no hay facturación (`null`). Si bajó a gratuito por mora,
+  // `planPrevioMora` trae el plan que recupera al pagar → banner ámbar en
+  // todas las pantallas del shell.
+  const { planPrevioMora } = data;
+  const diasParaFacturacion = data.facturacion?.diasParaFacturacion ?? null;
+  const enMora = data.facturacion?.enMora ?? false;
+  const diasEnMora = data.facturacion?.diasEnMora ?? 0;
   const mostrarModal = !enMora && diasParaFacturacion === 0 && !modalCerrado;
 
   return (
     <>
+      {planPrevioMora && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-sm font-medium text-amber-800 sm:px-8">
+          Tu iglesia pasó al plan gratuito por una mensualidad pendiente. Tus datos están guardados: al ponerte al día
+          recuperas el plan {PLAN_LABEL[planPrevioMora]}.
+        </div>
+      )}
+
       {enMora && (
         <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2.5 text-center text-sm font-medium text-destructive sm:px-8">
-          Tu facturación venció hace {diasEnMora} día{diasEnMora === 1 ? "" : "s"}. Ponte al día para evitar que se
-          suspenda el acceso de tu equipo.
+          Tu facturación venció hace {diasEnMora} día{diasEnMora === 1 ? "" : "s"}. Ponte al día: a los 3 días tu iglesia
+          pasa al plan gratuito y solo conserva la Red de iglesias.
         </div>
       )}
 

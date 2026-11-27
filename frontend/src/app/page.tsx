@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Bell, Building2 } from "lucide-react";
 
 import { ProximosEventos } from "@/components/agenda/proximos-eventos";
@@ -10,6 +11,7 @@ import { StatTile } from "@/components/dashboard/stat-tile";
 import { VersiculoDelDia } from "@/components/dashboard/versiculo-del-dia";
 import type { ManagerDashboardResponse } from "@/components/dashboard/types";
 import { MisTareasModal } from "@/components/notas/mis-tareas-modal";
+import { iglesiaEnPlanGratuito } from "@/components/red/permisos";
 import type { Nota } from "@/components/notas/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { apiFetch } from "@/lib/api";
@@ -49,6 +51,15 @@ function saludoSegunHora(): string {
 
 export default function Home() {
   const { usuario, ready } = useRequireAuth();
+  const router = useRouter();
+  // Plan GRATUITO: el dashboard es de pago — la portada es la Red de iglesias.
+  // Ninguna de las cargas de abajo corre en ese caso (`/dashboard`,
+  // `/notas/mis-tareas` y `/agenda/eventos` responderían 403).
+  const gratuito = iglesiaEnPlanGratuito(usuario);
+
+  useEffect(() => {
+    if (ready && gratuito) router.replace("/red");
+  }, [ready, gratuito, router]);
 
   const [tareas, setTareas] = useState<Nota[]>([]);
   const [modalTareasOpen, setModalTareasOpen] = useState(false);
@@ -57,17 +68,17 @@ export default function Home() {
   const [dashboardData, setDashboardData] = useState<ManagerDashboardResponse | null>(null);
 
   const cargarTareas = useCallback(async () => {
-    if (!usuario || !tieneAccesoTareas(usuario)) return;
+    if (!usuario || gratuito || !tieneAccesoTareas(usuario)) return;
     try {
       const data = await apiFetch<Nota[]>("/notas/mis-tareas");
       setTareas(data);
     } catch {
       // Si falla, simplemente no se muestra el aviso — no es una acción crítica del usuario.
     }
-  }, [usuario]);
+  }, [usuario, gratuito]);
 
   const cargarEventosProximos = useCallback(async () => {
-    if (!usuario || !tieneAccesoAgenda(usuario)) {
+    if (!usuario || gratuito || !tieneAccesoAgenda(usuario)) {
       setLoadingEventos(false);
       return;
     }
@@ -88,17 +99,17 @@ export default function Home() {
     } finally {
       setLoadingEventos(false);
     }
-  }, [usuario]);
+  }, [usuario, gratuito]);
 
   const cargarDashboard = useCallback(async () => {
-    if (!usuario || !tieneLandingPersonal(usuario)) return;
+    if (!usuario || gratuito || !tieneLandingPersonal(usuario)) return;
     try {
       const data = await apiFetch<ManagerDashboardResponse>("/dashboard");
       setDashboardData(data);
     } catch {
       // Igual que tareas/eventos: no crítico, la landing se ve completa igual sin estos datos.
     }
-  }, [usuario]);
+  }, [usuario, gratuito]);
 
   useEffect(() => {
     cargarTareas();
@@ -116,7 +127,7 @@ export default function Home() {
     setTareas((prev) => (tarea.estado === "EN_REVISION" ? prev.map((t) => (t.id === tarea.id ? tarea : t)) : prev.filter((t) => t.id !== tarea.id)));
   }
 
-  if (!ready || !usuario) {
+  if (!ready || !usuario || gratuito) {
     return null;
   }
 

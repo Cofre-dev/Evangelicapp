@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Search } from "lucide-react";
+import { BadgeCheck, Loader2, Search } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import {
   FACTURACION_BAR_CLASSES,
   PLAN_BADGE_CLASSES,
   PLAN_LABEL,
+  PLANES_TODOS,
+  planLabelConMora,
   type IglesiaListItem,
 } from "@/components/iglesias/types";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -24,7 +26,6 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { REGIONES_CHILE } from "@/lib/chile-regiones";
 
 const ESTADOS = ["ACTIVA", "SUSPENDIDA", "INACTIVA"] as const;
-const PLANES = ["BASICO", "MEDIO", "PRO"] as const;
 
 const ESTADO_LABEL: Record<(typeof ESTADOS)[number], string> = {
   ACTIVA: "Activa",
@@ -62,6 +63,8 @@ function IglesiasContent() {
   const estadoParam = searchParams.get("estado") ?? "";
   const planParam = searchParams.get("plan") ?? "";
   const regionParam = searchParams.get("region") ?? "";
+  const origenParam = searchParams.get("origen") ?? "";
+  const verificadaParam = searchParams.get("verificada") ?? "";
 
   // Input local para no disparar un fetch (y una escritura de URL) en cada
   // tecla — se sincroniza a la URL con debounce más abajo.
@@ -100,6 +103,8 @@ function IglesiasContent() {
     if (estadoParam) params.set("estado", estadoParam);
     if (planParam) params.set("plan", planParam);
     if (regionParam) params.set("region", regionParam);
+    if (origenParam) params.set("origen", origenParam);
+    if (verificadaParam) params.set("verificada", verificadaParam);
 
     try {
       const response = await apiFetch<IglesiaListItem[]>(`/iglesias?${params.toString()}`);
@@ -109,7 +114,7 @@ function IglesiasContent() {
     } finally {
       setLoading(false);
     }
-  }, [usuario, searchParam, estadoParam, planParam, regionParam]);
+  }, [usuario, searchParam, estadoParam, planParam, regionParam, origenParam, verificadaParam]);
 
   useEffect(() => {
     cargar();
@@ -124,6 +129,12 @@ function IglesiasContent() {
       if (!prev || !prev.some((i) => i.id === iglesia.id)) return prev;
       return prev.map((i) => (i.id === iglesia.id ? iglesia : i));
     });
+  });
+
+  // Alta por autoservicio: no viene la fila completa, así que se recarga el
+  // listado (puede empezar a matchear los filtros activos).
+  useRealtimeEvent("iglesia:registrada", () => {
+    void cargar();
   });
 
   if (!ready || !usuario) {
@@ -141,7 +152,9 @@ function IglesiasContent() {
     );
   }
 
-  const hayFiltrosActivos = Boolean(searchParam || estadoParam || planParam || regionParam);
+  const hayFiltrosActivos = Boolean(
+    searchParam || estadoParam || planParam || regionParam || origenParam || verificadaParam,
+  );
 
   return (
     <main className="h-full bg-background p-8">
@@ -204,7 +217,7 @@ function IglesiasContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TODOS}>Todos</SelectItem>
-                {PLANES.map((plan) => (
+                {PLANES_TODOS.map((plan) => (
                   <SelectItem key={plan} value={plan}>
                     {PLAN_LABEL[plan]}
                   </SelectItem>
@@ -229,6 +242,40 @@ function IglesiasContent() {
                     {r.region}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-full space-y-2 sm:w-40">
+            <Label htmlFor="filtro-origen">Origen</Label>
+            <Select
+              value={origenParam || TODOS}
+              onValueChange={(value) => actualizarQuery({ origen: value === TODOS ? "" : value })}
+            >
+              <SelectTrigger id="filtro-origen">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                <SelectItem value="AUTOSERVICIO">Autoservicio</SelectItem>
+                <SelectItem value="SUPER_ADMIN">Creada por admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-full space-y-2 sm:w-40">
+            <Label htmlFor="filtro-verificada">Verificada</Label>
+            <Select
+              value={verificadaParam || TODOS}
+              onValueChange={(value) => actualizarQuery({ verificada: value === TODOS ? "" : value })}
+            >
+              <SelectTrigger id="filtro-verificada">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                <SelectItem value="true">Verificadas</SelectItem>
+                <SelectItem value="false">Sin verificar</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -258,11 +305,24 @@ function IglesiasContent() {
                 <Link
                   key={iglesia.id}
                   href={`/superadmin/iglesias/${iglesia.id}`}
-                  className={`flex items-center gap-4 border-l-4 px-6 py-4 transition-colors hover:bg-accent/40 ${FACTURACION_BAR_CLASSES[iglesia.facturacion.color]}`}
+                  className={`flex items-center gap-4 border-l-4 px-6 py-4 transition-colors hover:bg-accent/40 ${
+                    // Plan GRATUITO: sin facturación → franja neutra.
+                    iglesia.facturacion ? FACTURACION_BAR_CLASSES[iglesia.facturacion.color] : "border-l-border"
+                  }`}
                 >
                   <IglesiaLogo logoUrl={iglesia.logoUrl} nombre={iglesia.nombre} size={36} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{iglesia.nombre}</p>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <p className="truncate text-sm font-medium text-foreground">{iglesia.nombre}</p>
+                      {iglesia.verificada && (
+                        <BadgeCheck className="h-4 w-4 shrink-0 text-sky-600" aria-label="Verificada" />
+                      )}
+                      {iglesia.origen === "AUTOSERVICIO" && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                          Autoservicio
+                        </span>
+                      )}
+                    </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {iglesia.comuna}, {iglesia.region}
                     </p>
@@ -276,7 +336,7 @@ function IglesiasContent() {
                   <span
                     className={`hidden shrink-0 rounded-full px-2 py-0.5 text-xs font-medium sm:inline-block ${PLAN_BADGE_CLASSES[iglesia.plan]}`}
                   >
-                    {PLAN_LABEL[iglesia.plan]}
+                    {planLabelConMora(iglesia.plan, iglesia.planPrevioMora)}
                   </span>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${ESTADO_BADGE_CLASSES[iglesia.estado]}`}

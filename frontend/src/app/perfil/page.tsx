@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CambiarPasswordForm } from "@/components/perfil/cambiar-password-form";
 import { EditarDatosForm } from "@/components/perfil/editar-datos-form";
 import { FotoPerfilUploader } from "@/components/perfil/foto-perfil-uploader";
+import { PreferenciasNotificaciones } from "@/components/perfil/preferencias-notificaciones";
+import { tieneAccesoRed } from "@/components/red/permisos";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 
 export default function PerfilPage() {
@@ -48,6 +50,18 @@ export default function PerfilPage() {
             <CambiarPasswordForm />
           </CardContent>
         </Card>
+
+        {tieneAccesoRed(usuario) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Notificaciones de la red</CardTitle>
+              <CardDescription>Siempre las verás en la campana de arriba.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PreferenciasNotificaciones />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   );

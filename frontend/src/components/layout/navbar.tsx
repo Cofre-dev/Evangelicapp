@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, ChevronDown, LogOut, Menu } from "lucide-react";
+import { Building2, ChevronDown, Lock, LogOut, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
+import { PLAN_BADGE_CLASSES, PLAN_LABEL, esPlanGratuito } from "@/components/iglesias/types";
+import { tieneAccesoRed } from "@/components/red/permisos";
 // Derivado de src/img/photo/logo-mark.png (1181x1181, 570 KB): recortado al
 // contenido + reducido a 128x128 con sharp. En Cloudflare Workers
 // (NEXT_IMAGES_UNOPTIMIZED=true, ver next.config.ts) next/image no reoptimiza
@@ -17,6 +18,8 @@ import { PLAN_BADGE_CLASSES, PLAN_LABEL } from "@/components/iglesias/types";
 import logoMark from "@/img/photo/logo-mark-nav.png";
 import { apiFetch, setCsrfToken } from "@/lib/api";
 import { useAuthStore, type SessionUser } from "@/stores/auth-store";
+import { useUpsellStore } from "@/stores/upsell-store";
+import { NotificacionesBell } from "./notificaciones-bell";
 
 /**
  * Un ítem de navegación es un link directo o un grupo colapsable con sub-links
@@ -27,7 +30,10 @@ import { useAuthStore, type SessionUser } from "@/stores/auth-store";
  */
 type NavItem =
   | { type: "link"; href: string; label: string }
-  | { type: "group"; label: string; children: { href: string; label: string }[] };
+  | { type: "group"; label: string; children: { href: string; label: string }[] }
+  // Módulo de pago visto desde una iglesia en plan GRATUITO: se muestra con
+  // candado y al hacer clic abre el upsell en vez de navegar.
+  | { type: "locked"; label: string };
 
 const INICIO_LINK: NavItem = { type: "link", href: "/", label: "Inicio" };
 const AGENDA_LINK: NavItem = { type: "link", href: "/agenda", label: "Agenda" };
@@ -38,6 +44,10 @@ const ACCESOS_LINK: NavItem = { type: "link", href: "/accesos", label: "Accesos"
 const INTEGRANTES_LINK: NavItem = { type: "link", href: "/integrantes", label: "Integrantes" };
 const MI_IGLESIA_LINK: NavItem = { type: "link", href: "/mi-iglesia", label: "Mi iglesia" };
 const FACTURACION_LINK: NavItem = { type: "link", href: "/facturacion", label: "Facturación" };
+// Red de iglesias: todos los planes, MANAGER y USUARIO.
+const RED_LINK: NavItem = { type: "link", href: "/red", label: "Red de iglesias" };
+
+const locked = (label: string): NavItem => ({ type: "locked", label });
 
 const CEREMONIAS_GRUPO: NavItem = {
   type: "group",
@@ -84,9 +94,40 @@ const ORDEN_MODULOS_USUARIO = ["AGENDA", "FINANZAS", "INTEGRANTES", "CEREMONIAS"
  * MIEMBRO no cambian.
  */
 function buildLinks(usuario: SessionUser): NavItem[] {
+  // Plan GRATUITO: solo la Red de iglesias (+ Mi iglesia/Facturación para el
+  // MANAGER y el perfil). El dashboard de inicio también es de pago, así que
+  // no hay "Inicio": `/` redirige a `/red`.
+  if (tieneAccesoRed(usuario) && usuario.iglesia && esPlanGratuito(usuario.iglesia.plan)) {
+    if (usuario.rol === "MANAGER") {
+      return [
+        RED_LINK,
+        locked("Agenda"),
+        locked("Finanzas"),
+        locked("Ceremonias"),
+        locked("Integrantes"),
+        locked("Notas"),
+        locked("Equipo"),
+        locked("Accesos"),
+        MI_IGLESIA_LINK,
+        FACTURACION_LINK,
+        PERFIL_LINK,
+      ];
+    }
+    return [
+      RED_LINK,
+      locked("Agenda"),
+      locked("Finanzas"),
+      locked("Ceremonias"),
+      locked("Integrantes"),
+      locked("Equipo"),
+      PERFIL_LINK,
+    ];
+  }
+
   if (usuario.rol === "MANAGER") {
     return [
       INICIO_LINK,
+      RED_LINK,
       AGENDA_LINK,
       FINANZAS_LINK,
       NOTAS_LINK,
@@ -104,11 +145,17 @@ function buildLinks(usuario: SessionUser): NavItem[] {
     const modulosLinks = ORDEN_MODULOS_USUARIO.filter((modulo) => usuario.modulos.includes(modulo)).map(
       (modulo) => MODULO_NAV_ITEM[modulo],
     );
-    return [INICIO_LINK, ...modulosLinks, EQUIPO_LINK, PERFIL_LINK];
+    return [INICIO_LINK, RED_LINK, ...modulosLinks, EQUIPO_LINK, PERFIL_LINK];
   }
 
   if (usuario.rol === "SUPER_ADMIN") {
-    return [INICIO_LINK, { type: "link", href: "/superadmin", label: "Dashboard" }, PERFIL_LINK];
+    return [
+      INICIO_LINK,
+      { type: "link", href: "/superadmin", label: "Dashboard" },
+      { type: "link", href: "/superadmin/iglesias", label: "Iglesias" },
+      { type: "link", href: "/superadmin/red", label: "Moderación de la red" },
+      PERFIL_LINK,
+    ];
   }
 
   // MIEMBRO
@@ -120,6 +167,7 @@ export function Navbar() {
   const router = useRouter();
   const usuario = useAuthStore((state) => state.usuario);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const abrirUpsell = useUpsellStore((state) => state.abrir);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(new Set());
 
@@ -198,6 +246,8 @@ export function Navbar() {
         </div>
 
         {usuario && (
+          <div className="flex items-center gap-2">
+          {tieneAccesoRed(usuario) && <NotificacionesBell />}
           <Sheet open={menuAbierto} onOpenChange={setMenuAbierto}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" aria-label="Abrir menú">
@@ -242,7 +292,20 @@ export function Navbar() {
                 {links.length > 0 && (
                   <nav className="mt-4 flex flex-col gap-1">
                     {links.map((link) =>
-                      link.type === "group" ? (
+                      link.type === "locked" ? (
+                        <button
+                          key={link.label}
+                          type="button"
+                          onClick={() => {
+                            setMenuAbierto(false);
+                            abrirUpsell();
+                          }}
+                          className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground/70 transition-colors hover:bg-accent/60 hover:text-foreground"
+                        >
+                          {link.label}
+                          <Lock className="h-4 w-4" aria-label="Disponible en los planes de pago" />
+                        </button>
+                      ) : link.type === "group" ? (
                         <div key={link.label}>
                           <button
                             type="button"
@@ -285,7 +348,7 @@ export function Navbar() {
                           href={link.href}
                           onClick={() => setMenuAbierto(false)}
                           className={
-                            pathname === link.href
+                            pathname === link.href || (link.href === "/red" && pathname.startsWith("/red/"))
                               ? "rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-primary"
                               : "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
                           }
@@ -311,6 +374,7 @@ export function Navbar() {
               </div>
             </SheetContent>
           </Sheet>
+          </div>
         )}
       </div>
     </header>

@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import type { AsistenciaRespondidaPayload, PredicadorRespondioPayload } from "@/components/agenda/types";
 import type { IntegranteRegistradoPayload } from "@/components/integrantes/types";
 import type { IglesiaListItem } from "@/components/iglesias/types";
+import type { TipoNotificacion } from "@/components/red/types";
 
 /**
  * Tiempo real de las 3 pantallas "en vivo" — dashboard SuperAdmin, detalle de
@@ -51,6 +52,15 @@ export interface RealtimeEventPayloads {
   /** Topic `'tenant:<iglesiaId>'` — un integrante respondió la convocatoria a
    *  un evento desde el link del correo. */
   "asistencia:respondida": AsistenciaRespondidaPayload;
+  /** Topic `'tenant:<iglesiaId>'` — nueva notificación para la iglesia. No
+   *  confiar en el payload: volver a pedir `GET /notificaciones/no-leidas`. */
+  "notificacion:nueva": { tipo: TipoNotificacion };
+  /** Topic `'tenant:<iglesiaId>'` — cambió un llamado de ayuda que le importa
+   *  a la iglesia (propio o al que apoya). Recargar si esa pantalla está abierta. */
+  "red:llamado-actualizado": { llamadoId: string };
+  /** Topic `'superadmin'` — una iglesia terminó su registro de autoservicio
+   *  (para refrescar la cola de verificación). */
+  "iglesia:registrada": { id: string; nombre: string; comuna: string; region: string };
 }
 
 export type RealtimeEventName = keyof RealtimeEventPayloads;
@@ -60,6 +70,9 @@ const EVENT_NAMES: RealtimeEventName[] = [
   "predicador:respondio",
   "integrante:registrado",
   "asistencia:respondida",
+  "notificacion:nueva",
+  "red:llamado-actualizado",
+  "iglesia:registrada",
 ];
 
 interface RealtimeTokenResponse {

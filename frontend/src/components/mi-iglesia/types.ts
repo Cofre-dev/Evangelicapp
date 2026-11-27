@@ -1,3 +1,5 @@
+import type { PlanIglesia } from "@/components/iglesias/types";
+
 export interface MiIglesia {
   id: string;
   nombre: string;
@@ -9,4 +11,6 @@ export interface MiIglesia {
   visitantesPromedio: number | null;
   createdAt: string;
   updatedAt: string;
+  plan: PlanIglesia;
+  verificada: boolean;
 }

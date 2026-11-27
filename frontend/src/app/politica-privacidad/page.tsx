@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const CONTACTO_EMAIL = "contacto@evangelicapp.cl";
-const ULTIMA_ACTUALIZACION = "26 de noviembre de 2026";
+const ULTIMA_ACTUALIZACION = "27 de noviembre de 2026";
 
 interface Seccion {
   id: string;
@@ -128,12 +128,25 @@ const SECCIONES: Seccion[] = [
     id: "con-quien-compartimos",
     titulo: "6. Con quién compartimos tus datos",
     contenido: (
+      <>
       <ul className="list-disc space-y-1.5 pl-5">
         <li>Con el personal administrativo de tu propia iglesia (Pastor/a, Tesorero/a, Secretaría) habilitado para ver el registro de integrantes.</li>
         <li>Con proveedores de infraestructura técnica (hosting, almacenamiento de archivos) que hacen funcionar la plataforma, quienes actúan como encargados del tratamiento y están obligados contractualmente a proteger tus datos.</li>
         <li>Nunca con otras iglesias registradas en la plataforma: cada iglesia solo accede a los datos de sus propios integrantes.</li>
         <li>Nunca con fines publicitarios ni de venta de datos a terceros.</li>
       </ul>
+      <p className="mt-3">
+        <strong>Red de iglesias:</strong> el perfil de la iglesia en la red (nombre, comuna, región, logo y, si la
+        iglesia los completa, descripción y datos de contacto) y sus llamados de ayuda son visibles para las demás
+        iglesias registradas en la plataforma. Los datos internos de cada iglesia (finanzas, integrantes, agenda) nunca
+        se comparten con otras iglesias.
+      </p>
+      <p className="mt-3">
+        <strong>Avisos por correo de la red:</strong> los avisos de la Red de iglesias (llamados nuevos, apoyos,
+        solicitudes de alianza) se envían por correo al equipo de la iglesia, y cada persona puede desactivarlos desde
+        su perfil en la plataforma.
+      </p>
+      </>
     ),
   },
   {

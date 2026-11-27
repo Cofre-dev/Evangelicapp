@@ -44,6 +44,9 @@ function LoginContent() {
   // esa página redirige acá con ?reset=ok. El backend ya cerró las sesiones
   // del usuario, así que llega deslogueado y tiene que entrar con la nueva.
   const resetOk = searchParams.get("reset") === "ok";
+  // Correo precargado desde la confirmación del registro de iglesia
+  // (/registro/confirmar/<token> → /login?email=...).
+  const emailInicial = searchParams.get("email") ?? "";
 
   // Si ya hay una sesión guardada, /login no debe mostrar el formulario de nuevo.
   useEffect(() => {
@@ -54,7 +57,7 @@ function LoginContent() {
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: emailInicial, password: "" },
   });
 
   if (hasHydrated && usuarioActual) {
@@ -182,8 +185,14 @@ function LoginContent() {
           </form>
         </Form>
 
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          ¿No tienes una cuenta? Pídele acceso al pastor o administrador de tu iglesia.
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          ¿Tu iglesia aún no tiene cuenta?{" "}
+          <Link href="/registro" className="font-semibold text-primary hover:underline">
+            Regístrala gratis
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          ¿Tu iglesia ya usa Evangelicapp? Pídele acceso al pastor o administrador.
         </p>
       </div>
     </main>

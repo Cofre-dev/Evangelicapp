@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import {
   FACTURACION_COLOR_CLASSES,
   PLAN_BADGE_CLASSES,
   PLAN_LABEL,
+  PLANES_TODOS,
+  planLabelConMora,
   type IglesiaDetalle,
   type MiembroEquipo,
   type PlanIglesia,
@@ -88,7 +90,7 @@ export default function IglesiaDetallePage() {
   useEffect(() => {
     if (data) {
       setPlanSeleccionado(data.plan);
-      setFechaFacturacion(data.facturacion.proximaFacturacion.slice(0, 10));
+      setFechaFacturacion(data.facturacion ? data.facturacion.proximaFacturacion.slice(0, 10) : "");
     }
   }, [data]);
 
@@ -112,6 +114,10 @@ export default function IglesiaDetallePage() {
 
   function marcarPagada() {
     ejecutarAccion("pagada", "/marcar-pagada", { method: "POST" });
+  }
+
+  function cambiarVerificacion(verificada: boolean) {
+    ejecutarAccion("verificacion", "/verificacion", { method: "PATCH", body: JSON.stringify({ verificada }) });
   }
 
   function ocultarIglesia() {
@@ -166,7 +172,7 @@ export default function IglesiaDetallePage() {
                 <IglesiaLogo logoUrl={data.logoUrl} nombre={data.nombre} size={56} />
 
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-xl font-semibold text-foreground">{data.nombre}</h1>
                     <span
                       className={
@@ -178,8 +184,23 @@ export default function IglesiaDetallePage() {
                       {ESTADO_LABEL[data.estado]}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE_CLASSES[data.plan]}`}>
-                      {PLAN_LABEL[data.plan]}
+                      {planLabelConMora(data.plan, data.planPrevioMora)}
                     </span>
+                    {data.verificada ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                        <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+                        Verificada
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        Sin verificar
+                      </span>
+                    )}
+                    {data.origen === "AUTOSERVICIO" && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Autoservicio
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {data.comuna}, {data.region}
@@ -197,6 +218,33 @@ export default function IglesiaDetallePage() {
                   <p className="text-xs text-muted-foreground">Visitantes promedio</p>
                   <p className="text-foreground">{data.visitantesPromedio ?? "—"}</p>
                 </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Origen</p>
+                  <p className="text-foreground">{data.origen === "AUTOSERVICIO" ? "Autoservicio" : "Creada por admin"}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                <p className="text-sm text-muted-foreground">
+                  {data.verificada
+                    ? `Verificada${data.verificadaEn ? ` el ${new Date(data.verificadaEn).toLocaleDateString("es-CL")}` : ""}.`
+                    : "Sin verificar: aparece así en el directorio de la Red de iglesias."}
+                </p>
+                <Button
+                  type="button"
+                  variant={data.verificada ? "outline" : "default"}
+                  size="sm"
+                  onClick={() => cambiarVerificacion(!data.verificada)}
+                  disabled={accionEnCurso !== null}
+                >
+                  {accionEnCurso === "verificacion" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : data.verificada ? (
+                    "Quitar verificación"
+                  ) : (
+                    "Verificar"
+                  )}
+                </Button>
               </div>
             </div>
 
@@ -266,6 +314,13 @@ export default function IglesiaDetallePage() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-sm font-medium text-foreground">Facturación</h2>
+                  {data.facturacion === null ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {data.planPrevioMora
+                        ? `Plan gratuito por mora: al confirmar el pago recupera el plan ${PLAN_LABEL[data.planPrevioMora]}.`
+                        : "Plan gratuito: sin facturación."}
+                    </p>
+                  ) : (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${FACTURACION_COLOR_CLASSES[data.facturacion.color]}`}
@@ -278,12 +333,30 @@ export default function IglesiaDetallePage() {
                         : `Faltan ${data.facturacion.diasParaFacturacion} día${data.facturacion.diasParaFacturacion === 1 ? "" : "s"}`}
                     </p>
                   </div>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">
                     Último pago: {data.ultimoPagoAt ? new Date(data.ultimoPagoAt).toLocaleDateString("es-CL") : "Nunca"}
                   </p>
                 </div>
-                <Button type="button" onClick={marcarPagada} disabled={accionEnCurso !== null}>
-                  {accionEnCurso === "pagada" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Marcar como pagada"}
+                {/* GRATUITO sin plan previo: no hay nada que "pagar" (el backend
+                    responde 400) — para contratar se usa "Cambiar plan". */}
+                <Button
+                  type="button"
+                  onClick={marcarPagada}
+                  disabled={accionEnCurso !== null || (data.plan === "GRATUITO" && !data.planPrevioMora)}
+                  title={
+                    data.plan === "GRATUITO" && !data.planPrevioMora
+                      ? "Iglesia en plan gratuito: para contratar usa \"Cambiar plan\""
+                      : undefined
+                  }
+                >
+                  {accionEnCurso === "pagada" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : data.planPrevioMora ? (
+                    `Confirmar pago y restaurar plan ${PLAN_LABEL[data.planPrevioMora]}`
+                  ) : (
+                    "Marcar como pagada"
+                  )}
                 </Button>
               </div>
 
@@ -302,7 +375,7 @@ export default function IglesiaDetallePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(["BASICO", "MEDIO", "PRO"] as const).map((plan) => (
+                        {PLANES_TODOS.map((plan) => (
                           <SelectItem key={plan} value={plan}>
                             {PLAN_LABEL[plan]}
                           </SelectItem>
@@ -318,8 +391,14 @@ export default function IglesiaDetallePage() {
                       {accionEnCurso === "plan" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
                     </Button>
                   </div>
+                  {data.plan === "GRATUITO" && planSeleccionado !== "GRATUITO" && (
+                    <p className="text-xs text-muted-foreground">
+                      Se fijará la próxima facturación a 30 días y se verificará la iglesia.
+                    </p>
+                  )}
                 </div>
 
+                {data.facturacion && (
                 <div className="space-y-2">
                   <Label htmlFor="editar-fecha">Corregir fecha de facturación</Label>
                   <div className="flex gap-2">
@@ -339,6 +418,7 @@ export default function IglesiaDetallePage() {
                     </Button>
                   </div>
                 </div>
+                )}
               </div>
 
               <div className="mt-6 border-t border-border pt-4">
@@ -352,13 +432,16 @@ export default function IglesiaDetallePage() {
                       type="button"
                       variant="destructive"
                       onClick={ocultarIglesia}
-                      disabled={accionEnCurso !== null || !data.facturacion.puedeOcultar}
-                      title={!data.facturacion.puedeOcultar ? "Disponible cuando la mora supere los 3 días" : undefined}
+                      disabled={accionEnCurso !== null || !data.facturacion?.puedeOcultar}
+                      title={!data.facturacion?.puedeOcultar ? "Disponible cuando la mora supere los 3 días" : undefined}
                     >
                       {accionEnCurso === "ocultar" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ocultar iglesia"}
                     </Button>
-                    {!data.facturacion.puedeOcultar && (
-                      <p className="text-xs text-muted-foreground">Disponible cuando la mora supere los 3 días.</p>
+                    {!data.facturacion?.puedeOcultar && (
+                      <p className="text-xs text-muted-foreground">
+                        Solo para planes de pago con 3 o más días de mora. El cobro diario ya las pasa a gratuito al
+                        tercer día, así que queda como herramienta manual de respaldo.
+                      </p>
                     )}
                   </div>
                 )}
@@ -380,7 +463,8 @@ export default function IglesiaDetallePage() {
               </div>
             </div>
 
-            <HistorialPagosCard iglesiaId={data.id} />
+            {/* Plan gratuito sin facturación: se esconde el historial (vacío). */}
+            {data.facturacion && <HistorialPagosCard iglesiaId={data.id} />}
 
             <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
               <h2 className="text-sm font-medium text-foreground">Pastor a cargo</h2>
