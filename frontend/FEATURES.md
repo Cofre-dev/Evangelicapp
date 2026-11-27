@@ -6,6 +6,31 @@ Formato de cada entrada: qué cambió, por qué, y qué queda pendiente o abiert
 
 ---
 
+## 2026-11-27 — RUT en el QR, borrado permanente de iglesias, marca y firma en correos
+
+- **Registro por QR** (`integrantes/registro/[qrToken]`): el campo pasa a llamarse "RUT", explica
+  el formato (con guion y dígito verificador, con o sin puntos, K incluida) y `normalizarRun`
+  tolera RUT sin guion, espacios y guiones tipográficos (varios usuarios fallaban ahí). Lo que se
+  envía siempre es `12345678-9`.
+- **Borrado permanente de iglesias** (SuperAdmin): "Zona de peligro" en el detalle de iglesia +
+  `EliminarIglesiaDialog` → `POST /iglesias/:id/eliminar` `{ motivo, confirmacionNombre }`
+  (backend `b17534f1`). Pide motivo (≥10 caracteres, va en el correo de despedida al pastor) y el
+  nombre exacto. Irreversible: borra en cascada equipo, integrantes, finanzas, agenda,
+  certificados y red, y limpia sus archivos de Storage.
+- **Correos** (backend): marca "Evangelicapp", logo en la cabecera de los correos de la
+  plataforma y pie "Timoteo, el asistente de Evangelicapp, envió este correo". El logo lo sirve
+  este frontend en `public/email/logo-evangelicapp.png` (recortado del logo oficial);
+  `EMAIL_LOGO_URL` en el backend permite moverlo.
+- Aclaración sobre el deploy de la Red de iglesias: el build de **producción** (`staging`)
+  pasó. El que falló fue la vista previa de la rama `feature/red-de-iglesias` en Workers Builds
+  (`wrangler versions upload` sin build previo: "Missing entry-point").
+
+**Pendiente**: cambiar `MAIL_FROM` en Render a `"Evangelicapp <no-reply@evangelicapp.cl>"` (el
+nombre del remitente sale de ahí); revisar la configuración de builds de ramas que no son de
+producción en Cloudflare (o desactivarlos).
+
+---
+
 ## 2026-11-27 — Red de iglesias + plan GRATUITO (autoservicio)
 
 **Por qué**: el backend implementó (2026-11-27) el plan GRATUITO (registro sin SuperAdmin, solo
